@@ -10,6 +10,11 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+const (
+	// ConfigureMePlaceholder is the default placeholder for unconfigured context
+	ConfigureMePlaceholder = "CONFIGURE_ME"
+)
+
 // Config represents the kubectx-timeout configuration
 type Config struct {
 	Timeout        TimeoutConfig      `yaml:"timeout"`
@@ -103,7 +108,7 @@ func detectSafeDefaultContext() string {
 	// Get all available contexts
 	contexts, err := GetAvailableContexts()
 	if err != nil || len(contexts) == 0 {
-		return "CONFIGURE_ME"
+		return ConfigureMePlaceholder
 	}
 
 	// Patterns that indicate a safe/dev context (in priority order)
@@ -199,7 +204,7 @@ func (c *Config) Validate() error {
 	}
 
 	// Check if default context needs to be configured
-	if c.DefaultContext == "CONFIGURE_ME" {
+	if c.DefaultContext == ConfigureMePlaceholder {
 		return fmt.Errorf("default_context must be configured - run 'kubectx-timeout init' to set up")
 	}
 

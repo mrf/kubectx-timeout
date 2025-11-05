@@ -8,6 +8,11 @@ import (
 	"time"
 )
 
+const (
+	shellBash = "bash"
+	shellZsh  = "zsh"
+)
+
 // ActivityTracker tracks kubectl command activity
 type ActivityTracker struct {
 	stateManager *StateManager
@@ -87,7 +92,7 @@ func GenerateShellIntegration(shell string, binaryPath string) (string, error) {
 	}
 
 	switch shell {
-	case "bash", "zsh":
+	case shellBash, shellZsh:
 		return fmt.Sprintf(`# kubectx-timeout shell integration for %s
 # Add this to your ~/.%src
 
@@ -116,9 +121,9 @@ func InstallShellIntegration(shell string) error {
 
 	var profilePath string
 	switch shell {
-	case "bash":
+	case shellBash:
 		profilePath = home + "/.bashrc"
-	case "zsh":
+	case shellZsh:
 		profilePath = home + "/.zshrc"
 	default:
 		return fmt.Errorf("unsupported shell: %s", shell)
@@ -141,11 +146,15 @@ func InstallShellIntegration(shell string) error {
 	}
 
 	// Append to profile
-	f, err := os.OpenFile(profilePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	f, err := os.OpenFile(profilePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
 	if err != nil {
 		return fmt.Errorf("failed to open profile: %w", err)
 	}
-	defer f.Close()
+	defer func() {
+		if closeErr := f.Close(); closeErr != nil && err == nil {
+			err = fmt.Errorf("failed to close profile: %w", closeErr)
+		}
+	}()
 
 	if _, err := f.WriteString("\n" + integration); err != nil {
 		return fmt.Errorf("failed to write to profile: %w", err)
