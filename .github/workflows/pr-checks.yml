@@ -21,7 +21,7 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.21'
+          go-version: '1.23'
           cache: true
 
       - name: Verify dependencies
@@ -120,7 +120,7 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.21'
+          go-version: '1.23'
           cache: true
 
       - name: Install metrics tools
@@ -153,8 +153,13 @@ jobs:
       - name: Check PR size
         run: |
           git fetch origin main:main
-          lines_changed=$(git diff --stat main...HEAD | tail -1 | awk '{print $4+$6}')
-          echo "Lines changed: $lines_changed"
+          # Extract insertions and deletions from git diff --stat
+          # Format: "X files changed, Y insertions(+), Z deletions(-)"
+          stat_output=$(git diff --stat main...HEAD | tail -1)
+          insertions=$(echo "$stat_output" | grep -oP '\d+(?= insertion)' || echo "0")
+          deletions=$(echo "$stat_output" | grep -oP '\d+(?= deletion)' || echo "0")
+          lines_changed=$((insertions + deletions))
+          echo "Lines changed: $lines_changed (insertions: $insertions, deletions: $deletions)"
 
           if [ "$lines_changed" -gt 1000 ]; then
             echo "⚠️  PR is large ($lines_changed lines). Consider breaking into smaller PRs."
