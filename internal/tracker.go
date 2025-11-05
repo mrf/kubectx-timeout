@@ -136,6 +136,7 @@ func InstallShellIntegration(shell string) error {
 	}
 
 	// Check if already installed
+	// #nosec G304 -- profilePath is a user shell profile path
 	content, err := os.ReadFile(profilePath)
 	if err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf("failed to read profile: %w", err)
@@ -146,6 +147,7 @@ func InstallShellIntegration(shell string) error {
 	}
 
 	// Append to profile
+	// #nosec G304 -- profilePath is a user shell profile path
 	f, err := os.OpenFile(profilePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
 	if err != nil {
 		return fmt.Errorf("failed to open profile: %w", err)

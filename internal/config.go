@@ -1,3 +1,6 @@
+// Package internal provides core functionality for kubectx-timeout daemon,
+// including configuration management, state tracking, context switching,
+// and activity monitoring for kubectl contexts with automatic timeout switching.
 package internal
 
 import (
@@ -176,6 +179,7 @@ func LoadConfig(path string) (*Config, error) {
 	}
 
 	// Read file
+	// #nosec G304 -- path is a configuration file path provided by user/system
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read config file: %w", err)
