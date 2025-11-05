@@ -1,3 +1,6 @@
+// Package internal provides core functionality for kubectx-timeout daemon,
+// including configuration management, state tracking, context switching,
+// and activity monitoring for kubectl contexts with automatic timeout switching.
 package internal
 
 import (
@@ -10,16 +13,21 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+const (
+	// ConfigureMePlaceholder is the default placeholder for unconfigured context
+	ConfigureMePlaceholder = "CONFIGURE_ME"
+)
+
 // Config represents the kubectx-timeout configuration
 type Config struct {
-	Timeout          TimeoutConfig       `yaml:"timeout"`
-	DefaultContext   string              `yaml:"default_context"`
-	Contexts         map[string]Context  `yaml:"contexts,omitempty"`
-	Daemon           DaemonConfig        `yaml:"daemon"`
-	Notifications    NotificationConfig  `yaml:"notifications"`
-	Safety           SafetyConfig        `yaml:"safety"`
-	StateFile        string              `yaml:"state_file"`
-	Shell            ShellConfig         `yaml:"shell"`
+	Timeout        TimeoutConfig      `yaml:"timeout"`
+	DefaultContext string             `yaml:"default_context"`
+	Contexts       map[string]Context `yaml:"contexts,omitempty"`
+	Daemon         DaemonConfig       `yaml:"daemon"`
+	Notifications  NotificationConfig `yaml:"notifications"`
+	Safety         SafetyConfig       `yaml:"safety"`
+	StateFile      string             `yaml:"state_file"`
+	Shell          ShellConfig        `yaml:"shell"`
 }
 
 // TimeoutConfig holds global timeout settings
@@ -52,10 +60,10 @@ type NotificationConfig struct {
 
 // SafetyConfig holds safety feature settings
 type SafetyConfig struct {
-	CheckActiveKubectl      bool     `yaml:"check_active_kubectl"`
-	NeverSwitchFrom         []string `yaml:"never_switch_from,omitempty"`
-	NeverSwitchTo           []string `yaml:"never_switch_to,omitempty"`
-	ValidateDefaultContext  bool     `yaml:"validate_default_context"`
+	CheckActiveKubectl     bool     `yaml:"check_active_kubectl"`
+	NeverSwitchFrom        []string `yaml:"never_switch_from,omitempty"`
+	NeverSwitchTo          []string `yaml:"never_switch_to,omitempty"`
+	ValidateDefaultContext bool     `yaml:"validate_default_context"`
 }
 
 // ShellConfig holds shell integration settings
@@ -103,7 +111,7 @@ func detectSafeDefaultContext() string {
 	// Get all available contexts
 	contexts, err := GetAvailableContexts()
 	if err != nil || len(contexts) == 0 {
-		return "CONFIGURE_ME"
+		return ConfigureMePlaceholder
 	}
 
 	// Patterns that indicate a safe/dev context (in priority order)
@@ -171,6 +179,7 @@ func LoadConfig(path string) (*Config, error) {
 	}
 
 	// Read file
+	// #nosec G304 -- path is a configuration file path provided by user/system
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read config file: %w", err)
@@ -199,7 +208,7 @@ func (c *Config) Validate() error {
 	}
 
 	// Check if default context needs to be configured
-	if c.DefaultContext == "CONFIGURE_ME" {
+	if c.DefaultContext == ConfigureMePlaceholder {
 		return fmt.Errorf("default_context must be configured - run 'kubectx-timeout init' to set up")
 	}
 

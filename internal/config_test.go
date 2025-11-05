@@ -137,8 +137,15 @@ func TestValidate(t *testing.T) {
 		wantError bool
 	}{
 		{
-			name:      "valid default config",
-			config:    DefaultConfig(),
+			name: "valid default config",
+			config: func() *Config {
+				cfg := DefaultConfig()
+				// Ensure we have a valid context for testing
+				if cfg.DefaultContext == "CONFIGURE_ME" || cfg.DefaultContext == "" {
+					cfg.DefaultContext = "test-context"
+				}
+				return cfg
+			}(),
 			wantError: false,
 		},
 		{
@@ -148,7 +155,7 @@ func TestValidate(t *testing.T) {
 					Default:       30 * time.Minute,
 					CheckInterval: 30 * time.Second,
 				},
-				Daemon: DaemonConfig{LogLevel: "info"},
+				Daemon:        DaemonConfig{LogLevel: "info"},
 				Notifications: NotificationConfig{Method: "both"},
 			},
 			wantError: true,
@@ -161,7 +168,7 @@ func TestValidate(t *testing.T) {
 					Default:       -1 * time.Minute,
 					CheckInterval: 30 * time.Second,
 				},
-				Daemon: DaemonConfig{LogLevel: "info"},
+				Daemon:        DaemonConfig{LogLevel: "info"},
 				Notifications: NotificationConfig{Method: "both"},
 			},
 			wantError: true,
@@ -174,7 +181,7 @@ func TestValidate(t *testing.T) {
 					Default:       30 * time.Minute,
 					CheckInterval: 30 * time.Second,
 				},
-				Daemon: DaemonConfig{LogLevel: "invalid"},
+				Daemon:        DaemonConfig{LogLevel: "invalid"},
 				Notifications: NotificationConfig{Method: "both"},
 			},
 			wantError: true,
@@ -187,7 +194,7 @@ func TestValidate(t *testing.T) {
 					Default:       30 * time.Minute,
 					CheckInterval: 30 * time.Second,
 				},
-				Daemon: DaemonConfig{LogLevel: "info"},
+				Daemon:        DaemonConfig{LogLevel: "info"},
 				Notifications: NotificationConfig{Method: "invalid"},
 			},
 			wantError: true,
@@ -200,7 +207,7 @@ func TestValidate(t *testing.T) {
 					Default:       5 * time.Minute,
 					CheckInterval: 10 * time.Minute,
 				},
-				Daemon: DaemonConfig{LogLevel: "info"},
+				Daemon:        DaemonConfig{LogLevel: "info"},
 				Notifications: NotificationConfig{Method: "both"},
 			},
 			wantError: true,
