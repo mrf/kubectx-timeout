@@ -7,7 +7,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/markferree/kubectx-timeout/internal"
+	"github.com/mrf/kubectx-timeout/internal"
 )
 
 const (

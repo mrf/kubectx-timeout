@@ -101,11 +101,21 @@ kubectl() {
     if [ -x "%s" ]; then
         "%s" record-activity >/dev/null 2>&1 &
     fi
-    
+
     # Execute the real kubectl
     command kubectl "$@"
 }
-`, shell, shell, binaryPath, binaryPath), nil
+
+kubectx() {
+    # Record activity before executing kubectx
+    if [ -x "%s" ]; then
+        "%s" record-activity >/dev/null 2>&1 &
+    fi
+
+    # Execute the real kubectx
+    command kubectx "$@"
+}
+`, shell, shell, binaryPath, binaryPath, binaryPath, binaryPath), nil
 
 	default:
 		return "", fmt.Errorf("unsupported shell: %s", shell)

@@ -1,4 +1,4 @@
-module github.com/markferree/kubectx-timeout
+module github.com/mrf/kubectx-timeout
 
 go 1.23.4
 

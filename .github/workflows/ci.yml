@@ -57,7 +57,7 @@ jobs:
         run: |
           # Check coverage for internal package only (cmd is a thin main wrapper)
           COVERAGE=$(go tool cover -func=coverage.txt | \
-            grep -E "github.com/markferree/kubectx-timeout/internal" | \
+            grep -E "github.com/mrf/kubectx-timeout/internal" | \
             awk '{sum+=$NF; count++} END {if (count>0) printf "%.1f", sum/count; else print "0"}')
           echo "Internal package coverage: ${COVERAGE}%"
           if (( $(echo "$COVERAGE < 60" | bc -l) )); then

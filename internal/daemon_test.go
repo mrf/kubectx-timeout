@@ -193,3 +193,73 @@ safety:
 	// but at least it exercises the code path
 	_ = daemon.ReloadConfig()
 }
+
+// TestDaemonStartupWithStaleState tests that daemon detects context changes on startup
+// Regression test for bug where daemon immediately switches on startup with stale state
+func TestDaemonStartupWithStaleState(t *testing.T) {
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "config.yaml")
+	statePath := filepath.Join(tmpDir, "state.json")
+
+	// Get current context
+	currentContext, err := GetCurrentContext()
+	if err != nil {
+		t.Skip("Skipping test - kubectl not available")
+	}
+
+	// Create config
+	configContent := `
+timeout:
+  default: 30m
+  check_interval: 30s
+default_context: ` + currentContext + `
+daemon:
+  enabled: true
+  log_level: info
+notifications:
+  enabled: false
+safety:
+  check_active_kubectl: false
+  validate_default_context: false
+`
+	if err := os.WriteFile(configPath, []byte(configContent), 0600); err != nil {
+		t.Fatalf("Failed to write config: %v", err)
+	}
+
+	// Create state file with OLD timestamp and DIFFERENT context
+	staleTime := time.Now().Add(-48 * time.Hour) // 48 hours ago
+	staleState := &State{
+		LastActivity:   staleTime,
+		CurrentContext: "some-old-context-name",
+		Version:        1,
+	}
+
+	sm, err := NewStateManager(statePath)
+	if err != nil {
+		t.Fatalf("Failed to create state manager: %v", err)
+	}
+
+	// Manually save stale state
+	if err := sm.Save(staleState); err != nil {
+		t.Fatalf("Failed to save stale state: %v", err)
+	}
+
+	// Create daemon - this should detect the context change and record activity
+	daemon, err := NewDaemon(configPath, statePath)
+	if err != nil {
+		t.Fatalf("NewDaemon failed: %v", err)
+	}
+
+	// Check that activity was updated (should be recent, not 48h ago)
+	lastActivity, _, err := daemon.stateManager.GetLastActivity()
+	if err != nil {
+		t.Fatalf("Failed to get last activity: %v", err)
+	}
+
+	timeSince := time.Since(lastActivity)
+	if timeSince > 5*time.Second {
+		t.Errorf("Expected recent activity after daemon startup with context change, but last activity was %v ago", timeSince)
+	}
+
+	t.Logf("Activity timestamp was correctly updated on startup (last activity: %v ago)", timeSince)
+}

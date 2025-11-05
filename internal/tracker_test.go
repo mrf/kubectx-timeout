@@ -220,3 +220,39 @@ func TestGetCurrentContext(t *testing.T) {
 
 	t.Logf("Current kubectl context: %s", context)
 }
+
+// TestGenerateShellIntegrationIncludesKubectx tests that shell integration includes kubectx wrapper
+// This is a regression test for the issue where manually running kubectx doesn't start the timer
+func TestGenerateShellIntegrationIncludesKubectx(t *testing.T) {
+	tests := []struct {
+		shell      string
+		binaryPath string
+	}{
+		{"bash", "/usr/local/bin/kubectx-timeout"},
+		{"zsh", "/usr/local/bin/kubectx-timeout"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.shell, func(t *testing.T) {
+			integration, err := GenerateShellIntegration(tt.shell, tt.binaryPath)
+			if err != nil {
+				t.Fatalf("GenerateShellIntegration failed: %v", err)
+			}
+
+			// Verify integration contains kubectx wrapper
+			if !strings.Contains(integration, "kubectx()") {
+				t.Error("integration should contain kubectx function wrapper")
+			}
+
+			// Verify kubectx wrapper calls record-activity
+			if !strings.Contains(integration, "kubectx") && strings.Contains(integration, "record-activity") {
+				t.Error("kubectx wrapper should call record-activity before executing kubectx")
+			}
+
+			// Verify kubectx wrapper calls the real kubectx command
+			if !strings.Contains(integration, "command kubectx") {
+				t.Error("kubectx wrapper should execute 'command kubectx' to invoke the real kubectx")
+			}
+		})
+	}
+}

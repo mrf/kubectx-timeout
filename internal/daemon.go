@@ -43,14 +43,51 @@ func NewDaemon(configPath string, statePath string) (*Daemon, error) {
 	// Create context switcher
 	switcher := NewContextSwitcher(logger)
 
-	return &Daemon{
+	daemon := &Daemon{
 		config:       config,
 		stateManager: sm,
 		switcher:     switcher,
 		ctx:          ctx,
 		cancel:       cancel,
 		logger:       logger,
-	}, nil
+	}
+
+	// Check if context changed while daemon was down
+	// If so, record fresh activity to prevent immediate timeout
+	if err := daemon.checkContextChangeOnStartup(); err != nil {
+		logger.Printf("Warning: failed to check context change on startup: %v", err)
+		// Don't fail daemon creation, just log warning
+	}
+
+	return daemon, nil
+}
+
+// checkContextChangeOnStartup detects if the context was manually changed while daemon was down
+func (d *Daemon) checkContextChangeOnStartup() error {
+	// Get current context
+	currentContext, err := GetCurrentContext()
+	if err != nil {
+		// If we can't get current context, skip this check
+		return nil
+	}
+
+	// Get last recorded context from state
+	_, lastContext, err := d.stateManager.GetLastActivity()
+	if err != nil {
+		// If we can't load state, skip this check
+		return nil
+	}
+
+	// If context changed, record fresh activity
+	if lastContext != "" && lastContext != currentContext {
+		d.logger.Printf("Context changed from '%s' to '%s' while daemon was down, resetting activity timer",
+			lastContext, currentContext)
+		if err := d.stateManager.RecordActivity(currentContext); err != nil {
+			return fmt.Errorf("failed to record activity: %w", err)
+		}
+	}
+
+	return nil
 }
 
 // Run starts the daemon main loop
