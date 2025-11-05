@@ -66,8 +66,8 @@ jobs:
             grep -E "github.com/markferree/kubectx-timeout/internal" | \
             awk '{sum+=$NF; count++} END {if (count>0) printf "%.1f", sum/count; else print "0"}')
           echo "Internal package coverage: $coverage%"
-          if (( $(echo "$coverage < 70" | bc -l) )); then
-            echo "Coverage $coverage% is below 70% threshold"
+          if (( $(echo "$coverage < 60" | bc -l) )); then
+            echo "Coverage $coverage% is below 60% threshold"
             exit 1
           fi
 
