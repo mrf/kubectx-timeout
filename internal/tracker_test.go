@@ -8,6 +8,14 @@ import (
 	"time"
 )
 
+// Helper function to get profile path for a given shell
+func getProfilePath(homeDir, shell string) string {
+	if shell == "bash" {
+		return filepath.Join(homeDir, ".bashrc")
+	}
+	return filepath.Join(homeDir, ".zshrc")
+}
+
 func TestNewActivityTracker(t *testing.T) {
 	tmpDir := t.TempDir()
 	statePath := filepath.Join(tmpDir, "state.json")
@@ -169,29 +177,25 @@ func TestInstallShellIntegration(t *testing.T) {
 				return
 			}
 
-			if !tt.wantError {
-				// Verify profile file was created/updated
-				var profilePath string
-				if tt.shell == "bash" {
-					profilePath = filepath.Join(tmpHome, ".bashrc")
-				} else if tt.shell == "zsh" {
-					profilePath = filepath.Join(tmpHome, ".zshrc")
-				}
+			if tt.wantError {
+				return // Expected error case, nothing more to verify
+			}
 
-				content, err := os.ReadFile(profilePath)
-				if err != nil {
-					t.Fatalf("Failed to read profile: %v", err)
-				}
+			// Verify profile file was created/updated
+			profilePath := getProfilePath(tmpHome, tt.shell)
+			content, err := os.ReadFile(profilePath)
+			if err != nil {
+				t.Fatalf("Failed to read profile: %v", err)
+			}
 
-				if !strings.Contains(string(content), "kubectx-timeout shell integration") {
-					t.Error("Profile should contain integration marker")
-				}
+			if !strings.Contains(string(content), "kubectx-timeout shell integration") {
+				t.Error("Profile should contain integration marker")
+			}
 
-				// Try installing again - should fail (already installed)
-				err = InstallShellIntegration(tt.shell)
-				if err == nil {
-					t.Error("Installing twice should return error")
-				}
+			// Try installing again - should fail (already installed)
+			err = InstallShellIntegration(tt.shell)
+			if err == nil {
+				t.Error("Installing twice should return error")
 			}
 		})
 	}

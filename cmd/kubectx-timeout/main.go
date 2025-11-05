@@ -69,7 +69,7 @@ func initializeConfig(configPath string) error {
 
 	// Create config directory
 	configDir := filepath.Dir(configPath)
-	if err := os.MkdirAll(configDir, 0755); err != nil {
+	if err := os.MkdirAll(configDir, 0750); err != nil {
 		return fmt.Errorf("failed to create config directory: %w", err)
 	}
 
@@ -143,7 +143,7 @@ shell:
     - zsh
 `, config.DefaultContext)
 
-	if err := os.WriteFile(configPath, []byte(configContent), 0644); err != nil {
+	if err := os.WriteFile(configPath, []byte(configContent), 0600); err != nil {
 		return fmt.Errorf("failed to write config file: %w", err)
 	}
 
