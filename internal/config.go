@@ -12,14 +12,14 @@ import (
 
 // Config represents the kubectx-timeout configuration
 type Config struct {
-	Timeout          TimeoutConfig       `yaml:"timeout"`
-	DefaultContext   string              `yaml:"default_context"`
-	Contexts         map[string]Context  `yaml:"contexts,omitempty"`
-	Daemon           DaemonConfig        `yaml:"daemon"`
-	Notifications    NotificationConfig  `yaml:"notifications"`
-	Safety           SafetyConfig        `yaml:"safety"`
-	StateFile        string              `yaml:"state_file"`
-	Shell            ShellConfig         `yaml:"shell"`
+	Timeout        TimeoutConfig      `yaml:"timeout"`
+	DefaultContext string             `yaml:"default_context"`
+	Contexts       map[string]Context `yaml:"contexts,omitempty"`
+	Daemon         DaemonConfig       `yaml:"daemon"`
+	Notifications  NotificationConfig `yaml:"notifications"`
+	Safety         SafetyConfig       `yaml:"safety"`
+	StateFile      string             `yaml:"state_file"`
+	Shell          ShellConfig        `yaml:"shell"`
 }
 
 // TimeoutConfig holds global timeout settings
@@ -52,10 +52,10 @@ type NotificationConfig struct {
 
 // SafetyConfig holds safety feature settings
 type SafetyConfig struct {
-	CheckActiveKubectl      bool     `yaml:"check_active_kubectl"`
-	NeverSwitchFrom         []string `yaml:"never_switch_from,omitempty"`
-	NeverSwitchTo           []string `yaml:"never_switch_to,omitempty"`
-	ValidateDefaultContext  bool     `yaml:"validate_default_context"`
+	CheckActiveKubectl     bool     `yaml:"check_active_kubectl"`
+	NeverSwitchFrom        []string `yaml:"never_switch_from,omitempty"`
+	NeverSwitchTo          []string `yaml:"never_switch_to,omitempty"`
+	ValidateDefaultContext bool     `yaml:"validate_default_context"`
 }
 
 // ShellConfig holds shell integration settings

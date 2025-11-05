@@ -17,10 +17,10 @@ const (
 func main() {
 	// Parse command-line flags
 	var (
-		configPath = flag.String("config", "~/.kubectx-timeout/config.yaml", "Path to configuration file")
-		statePath  = flag.String("state", "~/.kubectx-timeout/state.json", "Path to state file")
+		configPath  = flag.String("config", "~/.kubectx-timeout/config.yaml", "Path to configuration file")
+		statePath   = flag.String("state", "~/.kubectx-timeout/state.json", "Path to state file")
 		showVersion = flag.Bool("version", false, "Show version information")
-		initMode   = flag.Bool("init", false, "Initialize configuration")
+		initMode    = flag.Bool("init", false, "Initialize configuration")
 	)
 	flag.Parse()
 

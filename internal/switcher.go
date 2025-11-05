@@ -11,9 +11,9 @@ import (
 
 // ContextSwitcher handles safe kubectl context switching
 type ContextSwitcher struct {
-	logger      *log.Logger
-	maxRetries  int
-	retryDelay  time.Duration
+	logger     *log.Logger
+	maxRetries int
+	retryDelay time.Duration
 }
 
 // NewContextSwitcher creates a new context switcher

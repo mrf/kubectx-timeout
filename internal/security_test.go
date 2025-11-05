@@ -14,16 +14,16 @@ func TestCommandInjectionPrevention(t *testing.T) {
 	cs := NewContextSwitcher(logger)
 
 	maliciousContextNames := []string{
-		"'; rm -rf /tmp/test; echo '",           // Command injection attempt
-		"$(rm -rf /tmp/test)",                  // Command substitution
-		"`rm -rf /tmp/test`",                   // Backtick command substitution
-		"context\nrm -rf /tmp/test",            // Newline injection
-		"context; ls -la /",                    // Semicolon command separator
-		"context && ls -la /",                  // AND operator
-		"context || ls -la /",                  // OR operator
-		"context | cat /etc/passwd",            // Pipe operator
-		"../../../etc/passwd",                  // Path traversal attempt
-		"context\x00injection",                 // Null byte injection
+		"'; rm -rf /tmp/test; echo '", // Command injection attempt
+		"$(rm -rf /tmp/test)",         // Command substitution
+		"`rm -rf /tmp/test`",          // Backtick command substitution
+		"context\nrm -rf /tmp/test",   // Newline injection
+		"context; ls -la /",           // Semicolon command separator
+		"context && ls -la /",         // AND operator
+		"context || ls -la /",         // OR operator
+		"context | cat /etc/passwd",   // Pipe operator
+		"../../../etc/passwd",         // Path traversal attempt
+		"context\x00injection",        // Null byte injection
 	}
 
 	for _, maliciousName := range maliciousContextNames {
