@@ -1,0 +1,89 @@
+# golangci-lint configuration
+run:
+  timeout: 5m
+  tests: true
+  modules-download-mode: readonly
+
+linters:
+  enable:
+    # Enabled by default
+    - errcheck
+    - gosimple
+    - govet
+    - ineffassign
+    - staticcheck
+    - unused
+
+    # Additional linters
+    - bodyclose
+    - dupl
+    - exportloopref
+    - gochecknoinits
+    - goconst
+    - gocritic
+    - gocyclo
+    - gofmt
+    - goimports
+    - goprintffuncname
+    - gosec
+    - misspell
+    - nakedret
+    - nolintlint
+    - revive
+    - rowserrcheck
+    - sqlclosecheck
+    - stylecheck
+    - typecheck
+    - unconvert
+    - unparam
+    - whitespace
+
+    # Error handling
+    - errorlint
+    - errname
+
+    # Code complexity
+    - funlen
+    - gocognit
+    - nestif
+
+    # Performance
+    - prealloc
+
+linters-settings:
+  gocyclo:
+    min-complexity: 15
+
+  funlen:
+    lines: 100
+    statements: 50
+
+  goconst:
+    min-len: 3
+    min-occurrences: 3
+
+  misspell:
+    locale: US
+
+  revive:
+    confidence: 0.8
+
+  gosec:
+    excludes:
+      - G204  # Subprocess launched with variable - we need this for kubectl
+
+issues:
+  exclude-use-default: false
+  max-issues-per-linter: 0
+  max-same-issues: 0
+
+  exclude-rules:
+    # Exclude some linters from running on tests files
+    - path: _test\.go
+      linters:
+        - gocyclo
+        - errcheck
+        - dupl
+        - gosec
+        - funlen
+        - gocognit

@@ -1,0 +1,100 @@
+# kubectx-timeout configuration file
+#
+# This file should be placed at: ~/.kubectx-timeout/config.yaml
+# All durations are specified in Go duration format: 30s, 5m, 1h, etc.
+
+# Global timeout settings
+timeout:
+  # Default timeout for all contexts (unless overridden)
+  # After this period of kubectl inactivity, switch to the default context
+  default: 30m
+
+  # Check interval - how often the daemon checks for timeout
+  # Lower values = more responsive, higher values = less CPU usage
+  check_interval: 30s
+
+# Default context to switch to after timeout
+# This should be a safe context (e.g., non-production, read-only)
+default_context: local
+
+# Context-specific timeout overrides
+# Contexts not listed here will use the default timeout
+contexts:
+  production:
+    # Production gets a shorter timeout for safety
+    timeout: 5m
+    # Optional: require confirmation before switching away
+    # confirm_switch: true
+
+  staging:
+    timeout: 15m
+
+  dev:
+    timeout: 1h
+
+  local:
+    # Local context can have very long timeout (or disable entirely)
+    timeout: 24h
+
+# Daemon behavior
+daemon:
+  # Enable/disable the timeout daemon
+  enabled: true
+
+  # Log level: debug, info, warn, error
+  log_level: info
+
+  # Log file location (relative to ~/.kubectx-timeout/)
+  log_file: daemon.log
+
+  # Maximum log file size before rotation (in MB)
+  log_max_size: 10
+
+  # Number of old log files to keep
+  log_max_backups: 5
+
+# Notifications when context switch occurs
+notifications:
+  # Enable/disable notifications
+  enabled: true
+
+  # Notification method: terminal, macos, both
+  # terminal: print to stderr
+  # macos: use macOS native notifications
+  method: both
+
+  # Custom notification message template (optional)
+  # Available variables: {{.FromContext}}, {{.ToContext}}, {{.Reason}}
+  # message: "kubectl context switched from {{.FromContext}} to {{.ToContext}}"
+
+# Safety features
+safety:
+  # Prevent switching if kubectl command is currently running
+  check_active_kubectl: true
+
+  # Contexts that should never be auto-switched away from
+  # (useful for contexts that are always safe)
+  never_switch_from: []
+
+  # Contexts that should never be auto-switched to
+  # (extra safety - even if manually set as default)
+  never_switch_to:
+    - production
+    - prod
+
+  # Require the default context to exist in kubeconfig
+  validate_default_context: true
+
+# State file location (relative to ~/.kubectx-timeout/)
+state_file: state.json
+
+# Shell integration settings
+shell:
+  # Generate shell wrapper for kubectl
+  # This wrapper records kubectl activity
+  generate_wrapper: true
+
+  # Shell types to generate wrappers for
+  shells:
+    - bash
+    - zsh

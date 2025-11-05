@@ -1,0 +1,166 @@
+name: PR Quality Checks
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  quality-gate:
+    name: Code Quality Gate
+    runs-on: macos-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.21'
+          cache: true
+
+      - name: Verify dependencies
+        run: |
+          go mod download
+          go mod verify
+
+      - name: Format check
+        run: |
+          if [ "$(gofmt -s -l . | wc -l)" -gt 0 ]; then
+            echo "Code not formatted. Run: gofmt -s -w ."
+            gofmt -s -l .
+            exit 1
+          fi
+
+      - name: Install goimports
+        run: go install golang.org/x/tools/cmd/goimports@latest
+
+      - name: Import check
+        run: |
+          if [ "$(goimports -l . | wc -l)" -gt 0 ]; then
+            echo "Imports not organized. Run: goimports -w ."
+            goimports -l .
+            exit 1
+          fi
+
+      - name: Lint with golangci-lint
+        uses: golangci/golangci-lint-action@v6
+        with:
+          version: latest
+          args: --timeout=5m
+
+      - name: Run tests with race detector
+        run: go test -race -v -coverprofile=coverage.out ./...
+
+      - name: Check test coverage
+        run: |
+          coverage=$(go tool cover -func=coverage.out | grep total | awk '{print $3}' | sed 's/%//')
+          echo "Test coverage: $coverage%"
+          if (( $(echo "$coverage < 80" | bc -l) )); then
+            echo "Coverage $coverage% is below 80% threshold"
+            exit 1
+          fi
+
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage.out
+
+      - name: Install security scanner
+        run: go install github.com/securego/gosec/v2/cmd/gosec@latest
+
+      - name: Security scan with gosec
+        run: gosec -fmt=json -out=gosec-report.json ./...
+        continue-on-error: true
+
+      - name: Check security results
+        run: |
+          if [ -f gosec-report.json ]; then
+            issues=$(cat gosec-report.json | jq '.Issues | length')
+            if [ "$issues" -gt 0 ]; then
+              echo "Security issues found: $issues"
+              cat gosec-report.json | jq '.Issues'
+              exit 1
+            fi
+          fi
+
+      - name: Install vulnerability scanner
+        run: go install golang.org/x/vuln/cmd/govulncheck@latest
+
+      - name: Check for known vulnerabilities
+        run: govulncheck ./...
+
+      - name: Build binary
+        run: |
+          mkdir -p bin
+          go build -o bin/kubectx-timeout ./cmd/kubectx-timeout
+
+      - name: Verify binary
+        run: |
+          if [ ! -f bin/kubectx-timeout ]; then
+            echo "Binary build failed"
+            exit 1
+          fi
+          file bin/kubectx-timeout
+          ls -lh bin/kubectx-timeout
+
+  quality-metrics:
+    name: Code Quality Metrics
+    runs-on: macos-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.21'
+          cache: true
+
+      - name: Install metrics tools
+        run: |
+          go install github.com/fzipp/gocyclo/cmd/gocyclo@latest
+
+      - name: Calculate metrics
+        run: |
+          echo "=== Code Quality Metrics ==="
+          echo ""
+          echo "Lines of Code:"
+          find . -name "*.go" -not -path "./vendor/*" -exec wc -l {} + | tail -1
+          echo ""
+          echo "Cyclomatic Complexity (functions > 10):"
+          gocyclo -over 10 . || echo "No functions exceed complexity threshold"
+          echo ""
+          echo "Test Execution Time:"
+          go test -v ./... 2>&1 | grep "^ok" | awk '{print $2, $3}'
+
+  pr-size-check:
+    name: PR Size Check
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check PR size
+        run: |
+          git fetch origin main:main
+          lines_changed=$(git diff --stat main...HEAD | tail -1 | awk '{print $4+$6}')
+          echo "Lines changed: $lines_changed"
+
+          if [ "$lines_changed" -gt 1000 ]; then
+            echo "⚠️  PR is large ($lines_changed lines). Consider breaking into smaller PRs."
+            echo "Large PRs take longer to review and are more error-prone."
+          elif [ "$lines_changed" -gt 500 ]; then
+            echo "⚠️  PR is medium-large ($lines_changed lines). Reviewers allocated 1+ hour."
+          else
+            echo "✓ PR size is reasonable ($lines_changed lines)"
+          fi

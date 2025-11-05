@@ -1,0 +1,43 @@
+# Binaries for programs and plugins
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test binary, built with `go test -c`
+*.test
+
+# Output of the go coverage tool
+*.out
+coverage.txt
+coverage.html
+
+# Go workspace file
+go.work
+
+# Build artifacts
+/bin/
+/dist/
+kubectx-timeout
+
+# IDE and editor files
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Configuration and state files (examples should be committed)
+config.yaml
+state.json
+*.log
+
+# Dependencies
+/vendor/
+
+# Beads database (project-specific)
+.beads/*.db
+.beads/*.db-shm
+.beads/*.db-wal
