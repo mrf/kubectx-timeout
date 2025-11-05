@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!-- Service label (must match filename) -->
+    <key>Label</key>
+    <string>com.kubectx-timeout</string>
+
+    <!-- Program to run -->
+    <key>ProgramArguments</key>
+    <array>
+        <string>/usr/local/bin/kubectx-timeout</string>
+        <string>daemon</string>
+    </array>
+
+    <!-- Run automatically on login -->
+    <key>RunAtLoad</key>
+    <true/>
+
+    <!-- Keep alive - restart if it crashes -->
+    <key>KeepAlive</key>
+    <true/>
+
+    <!-- Standard output path -->
+    <key>StandardOutPath</key>
+    <string>/Users/YOUR_USERNAME/.kubectx-timeout/daemon.stdout.log</string>
+
+    <!-- Standard error path -->
+    <key>StandardErrorPath</key>
+    <string>/Users/YOUR_USERNAME/.kubectx-timeout/daemon.stderr.log</string>
+
+    <!-- Working directory -->
+    <key>WorkingDirectory</key>
+    <string>/Users/YOUR_USERNAME</string>
+
+    <!-- Environment variables -->
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+        <key>HOME</key>
+        <string>/Users/YOUR_USERNAME</string>
+    </dict>
+
+    <!-- Throttle interval to prevent rapid restarts (10 seconds) -->
+    <key>ThrottleInterval</key>
+    <integer>10</integer>
+
+    <!-- Process type -->
+    <key>ProcessType</key>
+    <string>Background</string>
+
+    <!-- Nice value (lower priority) -->
+    <key>Nice</key>
+    <integer>1</integer>
+</dict>
+</plist>

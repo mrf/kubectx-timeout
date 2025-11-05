@@ -1,0 +1,13 @@
+# Minimal kubectx-timeout configuration
+# Place at: ~/.kubectx-timeout/config.yaml
+#
+# TIP: Run 'kubectx-timeout init' for guided setup!
+
+# Default timeout for all contexts
+timeout:
+  default: 30m
+
+# Context to switch to after timeout
+# IMPORTANT: This should be a safe, non-production context
+# Run 'kubectl config get-contexts' to see your available contexts
+default_context: YOUR_SAFE_CONTEXT_HERE  # e.g., local, dev, minikube
