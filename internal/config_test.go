@@ -137,8 +137,15 @@ func TestValidate(t *testing.T) {
 		wantError bool
 	}{
 		{
-			name:      "valid default config",
-			config:    DefaultConfig(),
+			name: "valid default config",
+			config: func() *Config {
+				cfg := DefaultConfig()
+				// Ensure we have a valid context for testing
+				if cfg.DefaultContext == "CONFIGURE_ME" || cfg.DefaultContext == "" {
+					cfg.DefaultContext = "test-context"
+				}
+				return cfg
+			}(),
 			wantError: false,
 		},
 		{
