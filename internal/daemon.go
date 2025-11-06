@@ -200,8 +200,8 @@ func (d *Daemon) switchContext(fromContext, toContext string) error {
 
 // ReloadConfig reloads the daemon configuration
 func (d *Daemon) ReloadConfig() error {
-	// Load new configuration
-	config, err := LoadConfig("~/.kubectx-timeout/config.yaml")
+	// Load new configuration from XDG path
+	config, err := LoadConfig(GetConfigPath())
 	if err != nil {
 		return fmt.Errorf("failed to load config: %w", err)
 	}

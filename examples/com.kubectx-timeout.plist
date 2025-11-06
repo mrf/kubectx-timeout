@@ -21,13 +21,13 @@
     <key>KeepAlive</key>
     <true/>
 
-    <!-- Standard output path -->
+    <!-- Standard output path (XDG Base Directory compliant) -->
     <key>StandardOutPath</key>
-    <string>/Users/YOUR_USERNAME/.kubectx-timeout/daemon.stdout.log</string>
+    <string>/Users/YOUR_USERNAME/.local/state/kubectx-timeout/daemon.stdout.log</string>
 
-    <!-- Standard error path -->
+    <!-- Standard error path (XDG Base Directory compliant) -->
     <key>StandardErrorPath</key>
-    <string>/Users/YOUR_USERNAME/.kubectx-timeout/daemon.stderr.log</string>
+    <string>/Users/YOUR_USERNAME/.local/state/kubectx-timeout/daemon.stderr.log</string>
 
     <!-- Working directory -->
     <key>WorkingDirectory</key>

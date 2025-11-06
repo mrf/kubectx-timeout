@@ -1,5 +1,6 @@
 # Minimal kubectx-timeout configuration
-# Place at: ~/.kubectx-timeout/config.yaml
+# Place at: ~/.config/kubectx-timeout/config.yaml
+# (or $XDG_CONFIG_HOME/kubectx-timeout/config.yaml)
 #
 # TIP: Run 'kubectx-timeout init' for guided setup!
 

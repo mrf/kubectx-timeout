@@ -695,6 +695,82 @@ func Switch(contextName string) error {
 }
 ```
 
+### XDG Base Directory Compliance
+
+The project follows the [XDG Base Directory Specification](https://specifications.freedesktop.org/basedir-spec/basedir-spec-latest.html) for file organization:
+
+```go
+// GOOD: Use XDG-compliant paths
+import "github.com/mrf/kubectx-timeout/internal"
+
+func GetConfigPath() string {
+    return internal.GetConfigPath()  // ~/.config/kubectx-timeout/config.yaml
+}
+
+func GetStatePath() string {
+    return internal.GetStatePath()   // ~/.local/state/kubectx-timeout/state.json
+}
+
+// BAD: Hardcoded home directory paths
+func GetConfigPath() string {
+    home, _ := os.UserHomeDir()
+    return filepath.Join(home, ".kubectx-timeout", "config.yaml")  // Wrong!
+}
+```
+
+**XDG Directory Structure:**
+
+- **Config**: `~/.config/kubectx-timeout/` (or `$XDG_CONFIG_HOME/kubectx-timeout/`)
+  - `config.yaml` - User configuration
+
+- **State**: `~/.local/state/kubectx-timeout/` (or `$XDG_STATE_HOME/kubectx-timeout/`)
+  - `state.json` - Activity tracking state
+  - `daemon.log` - Daemon logs
+  - `daemon.stdout.log` - launchd stdout
+  - `daemon.stderr.log` - launchd stderr
+
+**Path Helper Functions:**
+
+Always use the provided path helper functions in `internal/paths.go`:
+
+```go
+// Get directories
+configDir := internal.GetConfigDir()     // ~/.config/kubectx-timeout
+stateDir := internal.GetStateDir()       // ~/.local/state/kubectx-timeout
+
+// Get file paths
+configPath := internal.GetConfigPath()   // ~/.config/kubectx-timeout/config.yaml
+statePath := internal.GetStatePath()     // ~/.local/state/kubectx-timeout/state.json
+logPath := internal.GetLogPath()         // ~/.local/state/kubectx-timeout/daemon.log
+```
+
+**Testing XDG Paths:**
+
+When writing tests that involve paths, always set and restore environment variables:
+
+```go
+func TestConfigPath(t *testing.T) {
+    // Save and restore environment
+    oldXDG := os.Getenv("XDG_CONFIG_HOME")
+    defer os.Setenv("XDG_CONFIG_HOME", oldXDG)
+
+    // Test with custom XDG path
+    os.Setenv("XDG_CONFIG_HOME", "/custom/config")
+    path := GetConfigPath()
+
+    expected := "/custom/config/kubectx-timeout/config.yaml"
+    assert.Equal(t, expected, path)
+}
+```
+
+**Benefits of XDG:**
+
+1. **Clean Home Directory**: No dotfile clutter in `~/`
+2. **Standard Locations**: Follows modern Unix/Linux conventions
+3. **User Control**: Respects `$XDG_*` environment variables
+4. **Separation of Concerns**: Config and state in different directories
+5. **Backup Friendly**: Easy to back up just config or just state
+
 ---
 
 ## Tool Configuration

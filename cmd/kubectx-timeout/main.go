@@ -15,10 +15,14 @@ const (
 )
 
 func main() {
+	// Get default paths using XDG Base Directory spec
+	defaultConfigPath := internal.GetConfigPath()
+	defaultStatePath := internal.GetStatePath()
+
 	// Parse command-line flags
 	var (
-		configPath  = flag.String("config", "~/.kubectx-timeout/config.yaml", "Path to configuration file")
-		statePath   = flag.String("state", "~/.kubectx-timeout/state.json", "Path to state file")
+		configPath  = flag.String("config", defaultConfigPath, "Path to configuration file")
+		statePath   = flag.String("state", defaultStatePath, "Path to state file")
 		showVersion = flag.Bool("version", false, "Show version information")
 		initMode    = flag.Bool("init", false, "Initialize configuration")
 	)

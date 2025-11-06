@@ -378,16 +378,39 @@ kubectx-timeout/
 │   └── kubectx-timeout/
 │       └── main.go
 ├── internal/               # Private application code
-│   ├── config/            # Configuration loading
-│   ├── daemon/            # Core daemon logic
-│   ├── tracker/           # Activity tracking
-│   ├── switcher/          # Context switching
-│   └── notify/            # Notification system
+│   ├── config.go          # Configuration loading & validation
+│   ├── daemon.go          # Core daemon logic
+│   ├── paths.go           # XDG path management
+│   ├── state.go           # State file management
+│   ├── switcher.go        # Context switching
+│   └── tracker.go         # Activity tracking & shell integration
+├── examples/              # Example configurations
+│   ├── config.example.yaml
+│   ├── config.minimal.yaml
+│   └── com.kubectx-timeout.plist
 ├── scripts/               # Build and install scripts
 ├── .github/               # CI/CD and PR templates
 ├── Makefile               # Common development tasks
 └── go.mod                 # Go module dependencies
 ```
+
+### File Locations (XDG Compliant)
+
+The project follows the [XDG Base Directory Specification](https://specifications.freedesktop.org/basedir-spec/basedir-spec-latest.html):
+
+**Configuration:**
+- Default: `~/.config/kubectx-timeout/config.yaml`
+- Override: `$XDG_CONFIG_HOME/kubectx-timeout/config.yaml`
+
+**State & Logs:**
+- Default: `~/.local/state/kubectx-timeout/`
+- Override: `$XDG_STATE_HOME/kubectx-timeout/`
+  - `state.json` - Activity tracking
+  - `daemon.log` - Daemon logs
+  - `daemon.stdout.log` - launchd stdout
+  - `daemon.stderr.log` - launchd stderr
+
+See [DEVELOPMENT.md](DEVELOPMENT.md#xdg-base-directory-compliance) for implementation details.
 
 ---
 

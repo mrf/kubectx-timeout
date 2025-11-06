@@ -1,6 +1,7 @@
 # kubectx-timeout configuration file
 #
-# This file should be placed at: ~/.kubectx-timeout/config.yaml
+# This file should be placed at: ~/.config/kubectx-timeout/config.yaml
+# (or $XDG_CONFIG_HOME/kubectx-timeout/config.yaml if XDG_CONFIG_HOME is set)
 # All durations are specified in Go duration format: 30s, 5m, 1h, etc.
 
 # Global timeout settings
@@ -44,7 +45,7 @@ daemon:
   # Log level: debug, info, warn, error
   log_level: info
 
-  # Log file location (relative to ~/.kubectx-timeout/)
+  # Log file location (relative to state directory: ~/.local/state/kubectx-timeout/)
   log_file: daemon.log
 
   # Maximum log file size before rotation (in MB)
@@ -85,7 +86,7 @@ safety:
   # Require the default context to exist in kubeconfig
   validate_default_context: true
 
-# State file location (relative to ~/.kubectx-timeout/)
+# State file location (relative to state directory: ~/.local/state/kubectx-timeout/)
 state_file: state.json
 
 # Shell integration settings
