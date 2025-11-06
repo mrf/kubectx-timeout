@@ -276,7 +276,7 @@ func TestDaemonStartupWithStaleTimestamp(t *testing.T) {
 	// Get current context
 	currentContext, err := GetCurrentContext()
 	if err != nil {
-		t.Fatalf("Failed to get current context: %v", err)
+		t.Skip("Skipping test - kubectl not available")
 	}
 
 	// Write config
@@ -349,7 +349,7 @@ func TestDaemonStartupWithZeroTimestamp(t *testing.T) {
 	// Get current context
 	currentContext, err := GetCurrentContext()
 	if err != nil {
-		t.Fatalf("Failed to get current context: %v", err)
+		t.Skip("Skipping test - kubectl not available")
 	}
 
 	// Write config
