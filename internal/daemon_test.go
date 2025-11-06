@@ -1,6 +1,7 @@
 package internal
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -262,4 +263,155 @@ safety:
 	}
 
 	t.Logf("Activity timestamp was correctly updated on startup (last activity: %v ago)", timeSince)
+}
+
+// TestDaemonStartupWithStaleTimestamp verifies that daemon resets activity timer
+// when starting with stale timestamp (same context, but very old timestamp)
+func TestDaemonStartupWithStaleTimestamp(t *testing.T) {
+	// Create temp directories
+	configDir := t.TempDir()
+	configPath := filepath.Join(configDir, "config.yaml")
+	statePath := filepath.Join(configDir, "state.json")
+
+	// Get current context
+	currentContext, err := GetCurrentContext()
+	if err != nil {
+		t.Fatalf("Failed to get current context: %v", err)
+	}
+
+	// Write config
+	configContent := fmt.Sprintf(`
+timeout:
+  default: 30m
+  check_interval: 1s
+default_context: %s
+daemon:
+  enabled: true
+  log_level: info
+`, currentContext)
+
+	if err := os.WriteFile(configPath, []byte(configContent), 0600); err != nil {
+		t.Fatalf("Failed to write config: %v", err)
+	}
+
+	// Create state manager
+	sm, err := NewStateManager(statePath)
+	if err != nil {
+		t.Fatalf("Failed to create state manager: %v", err)
+	}
+
+	// Create state with very old timestamp but SAME context
+	// (simulating daemon being down for 48 hours)
+	staleState := &State{
+		LastActivity:   time.Now().Add(-48 * time.Hour),
+		CurrentContext: currentContext, // Same context, not changed
+	}
+
+	// Manually save stale state
+	if err := sm.Save(staleState); err != nil {
+		t.Fatalf("Failed to save stale state: %v", err)
+	}
+
+	// Create daemon - this should detect stale timestamp and reset activity timer
+	daemon, err := NewDaemon(configPath, statePath)
+	if err != nil {
+		t.Fatalf("NewDaemon failed: %v", err)
+	}
+
+	// Check that activity was updated (should be recent, not 48h ago)
+	lastActivity, recordedContext, err := daemon.stateManager.GetLastActivity()
+	if err != nil {
+		t.Fatalf("Failed to get last activity: %v", err)
+	}
+
+	// Verify context is still the same
+	if recordedContext != currentContext {
+		t.Errorf("Context changed unexpectedly: got %s, want %s", recordedContext, currentContext)
+	}
+
+	// Verify timestamp was reset (should be very recent)
+	timeSince := time.Since(lastActivity)
+	if timeSince > 5*time.Second {
+		t.Errorf("Expected recent activity after daemon startup with stale timestamp, but last activity was %v ago", timeSince)
+	}
+
+	t.Logf("Stale timestamp was correctly reset on startup (last activity: %v ago)", timeSince)
+}
+
+// TestDaemonStartupWithZeroTimestamp verifies that daemon handles zero/uninitialized timestamps
+// (which can happen on first run or with corrupted state)
+func TestDaemonStartupWithZeroTimestamp(t *testing.T) {
+	// Create temp directories
+	configDir := t.TempDir()
+	configPath := filepath.Join(configDir, "config.yaml")
+	statePath := filepath.Join(configDir, "state.json")
+
+	// Get current context
+	currentContext, err := GetCurrentContext()
+	if err != nil {
+		t.Fatalf("Failed to get current context: %v", err)
+	}
+
+	// Write config
+	configContent := fmt.Sprintf(`
+timeout:
+  default: 30m
+  check_interval: 1s
+default_context: %s
+daemon:
+  enabled: true
+  log_level: info
+`, currentContext)
+
+	if err := os.WriteFile(configPath, []byte(configContent), 0600); err != nil {
+		t.Fatalf("Failed to write config: %v", err)
+	}
+
+	// Create state manager
+	sm, err := NewStateManager(statePath)
+	if err != nil {
+		t.Fatalf("Failed to create state manager: %v", err)
+	}
+
+	// Create state with zero timestamp (simulating first run or corruption)
+	zeroState := &State{
+		LastActivity:   time.Time{}, // Zero value
+		CurrentContext: currentContext,
+		Version:        1,
+	}
+
+	// Manually save zero state
+	if err := sm.Save(zeroState); err != nil {
+		t.Fatalf("Failed to save zero state: %v", err)
+	}
+
+	// Create daemon - this should detect zero timestamp and reset activity timer
+	daemon, err := NewDaemon(configPath, statePath)
+	if err != nil {
+		t.Fatalf("NewDaemon failed: %v", err)
+	}
+
+	// Check that activity was initialized (should be recent, not zero)
+	lastActivity, recordedContext, err := daemon.stateManager.GetLastActivity()
+	if err != nil {
+		t.Fatalf("Failed to get last activity: %v", err)
+	}
+
+	// Verify context is still the same
+	if recordedContext != currentContext {
+		t.Errorf("Context changed unexpectedly: got %s, want %s", recordedContext, currentContext)
+	}
+
+	// Verify timestamp was initialized (should not be zero)
+	if lastActivity.IsZero() {
+		t.Error("Expected non-zero timestamp after daemon startup, but got zero")
+	}
+
+	// Verify timestamp is very recent
+	timeSince := time.Since(lastActivity)
+	if timeSince > 5*time.Second {
+		t.Errorf("Expected recent activity after daemon startup with zero timestamp, but last activity was %v ago", timeSince)
+	}
+
+	t.Logf("Zero timestamp was correctly initialized on startup (last activity: %v ago)", timeSince)
 }

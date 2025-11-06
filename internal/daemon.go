@@ -62,7 +62,8 @@ func NewDaemon(configPath string, statePath string) (*Daemon, error) {
 	return daemon, nil
 }
 
-// checkContextChangeOnStartup detects if the context was manually changed while daemon was down
+// checkContextChangeOnStartup resets the activity timer on daemon startup to prevent
+// immediate timeout due to stale timestamps while the daemon was not running
 func (d *Daemon) checkContextChangeOnStartup() error {
 	// Get current context
 	currentContext, err := GetCurrentContext()
@@ -71,17 +72,43 @@ func (d *Daemon) checkContextChangeOnStartup() error {
 		return nil
 	}
 
-	// Get last recorded context from state
-	_, lastContext, err := d.stateManager.GetLastActivity()
+	// Get last recorded context and timestamp from state
+	lastActivity, lastContext, err := d.stateManager.GetLastActivity()
 	if err != nil {
-		// If we can't load state, skip this check
+		// If we can't load state, record fresh activity
+		d.logger.Printf("No previous state found, recording initial activity for context '%s'", currentContext)
+		if err := d.stateManager.RecordActivity(currentContext); err != nil {
+			return fmt.Errorf("failed to record activity: %w", err)
+		}
 		return nil
 	}
 
-	// If context changed, record fresh activity
+	// Check for zero/uninitialized timestamp (first run or corrupted state)
+	if lastActivity.IsZero() {
+		d.logger.Printf("No previous activity timestamp found, recording initial activity for context '%s'", currentContext)
+		if err := d.stateManager.RecordActivity(currentContext); err != nil {
+			return fmt.Errorf("failed to record activity: %w", err)
+		}
+		return nil
+	}
+
+	// Check if context changed while daemon was down
 	if lastContext != "" && lastContext != currentContext {
 		d.logger.Printf("Context changed from '%s' to '%s' while daemon was down, resetting activity timer",
 			lastContext, currentContext)
+		if err := d.stateManager.RecordActivity(currentContext); err != nil {
+			return fmt.Errorf("failed to record activity: %w", err)
+		}
+		return nil
+	}
+
+	// Check if the last activity timestamp is stale (older than timeout)
+	// This prevents immediate timeout when daemon restarts after being down for a while
+	timeout := d.config.GetTimeoutForContext(currentContext)
+	timeSinceActivity := time.Since(lastActivity)
+	if timeSinceActivity > timeout {
+		d.logger.Printf("Daemon was down for %v (longer than timeout %v), resetting activity timer for context '%s'",
+			timeSinceActivity.Round(time.Second), timeout, currentContext)
 		if err := d.stateManager.RecordActivity(currentContext); err != nil {
 			return fmt.Errorf("failed to record activity: %w", err)
 		}
