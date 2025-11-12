@@ -222,6 +222,14 @@ func (d *Daemon) switchContext(fromContext, toContext string) error {
 	}
 
 	d.logger.Printf("Successfully switched context from '%s' to '%s'", fromContext, toContext)
+
+	// Record activity in the new context to keep state file in sync
+	// This prevents the daemon from immediately trying to switch again
+	if err := d.stateManager.RecordActivity(toContext); err != nil {
+		d.logger.Printf("Warning: failed to record activity after context switch: %v", err)
+		// Don't return error - the switch was successful
+	}
+
 	return nil
 }
 

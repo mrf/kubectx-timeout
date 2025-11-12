@@ -107,13 +107,18 @@ kubectl() {
 }
 
 kubectx() {
-    # Record activity before executing kubectx
-    if [ -x "%s" ]; then
+    # Execute the real kubectx first
+    command kubectx "$@"
+    local exit_code=$?
+
+    # Record activity after context switch (only if successful)
+    # This ensures we capture the NEW context, not the old one
+    if [ $exit_code -eq 0 ] && [ -x "%s" ]; then
         "%s" record-activity >/dev/null 2>&1 &
     fi
 
-    # Execute the real kubectx
-    command kubectx "$@"
+    # Return the original exit code
+    return $exit_code
 }
 `, shell, shell, binaryPath, binaryPath, binaryPath, binaryPath), nil
 

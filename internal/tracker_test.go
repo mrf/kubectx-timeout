@@ -202,20 +202,23 @@ func TestInstallShellIntegration(t *testing.T) {
 }
 
 func TestGetCurrentContext(t *testing.T) {
-	// This test will only pass if kubectl is installed and configured
-	// We'll make it optional based on kubectl availability
+	// Setup isolated test environment to avoid leaking real context names
+	tmpDir := t.TempDir()
+	restoreKubeconfig := setupTestKubeconfig(t, tmpDir)
+	defer restoreKubeconfig()
 
 	context, err := GetCurrentContext()
-
 	if err != nil {
-		// kubectl might not be available or configured in test environment
-		// That's OK, just log it
-		t.Logf("GetCurrentContext failed (expected if kubectl not configured): %v", err)
-		return
+		t.Fatalf("GetCurrentContext failed: %v", err)
 	}
 
 	if context == "" {
 		t.Error("GetCurrentContext returned empty context")
+	}
+
+	// Verify we got the test context from isolated kubeconfig
+	if context != "test-default" {
+		t.Errorf("Expected test-default context from isolated kubeconfig, got: %s", context)
 	}
 
 	t.Logf("Current kubectl context: %s", context)
@@ -252,6 +255,66 @@ func TestGenerateShellIntegrationIncludesKubectx(t *testing.T) {
 			// Verify kubectx wrapper calls the real kubectx command
 			if !strings.Contains(integration, "command kubectx") {
 				t.Error("kubectx wrapper should execute 'command kubectx' to invoke the real kubectx")
+			}
+		})
+	}
+}
+
+// TestKubectxWrapperRecordsActivityAfterSwitch tests that kubectx wrapper records activity
+// AFTER the context switch completes, not before. This ensures we capture the NEW context,
+// not the old one.
+// This is a regression test for the race condition where record-activity runs in parallel
+// with kubectx and might capture the old context before the switch completes.
+func TestKubectxWrapperRecordsActivityAfterSwitch(t *testing.T) {
+	tests := []struct {
+		shell string
+	}{
+		{"bash"},
+		{"zsh"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.shell, func(t *testing.T) {
+			integration, err := GenerateShellIntegration(tt.shell, "/usr/local/bin/kubectx-timeout")
+			if err != nil {
+				t.Fatalf("GenerateShellIntegration failed: %v", err)
+			}
+
+			// Find the kubectx function in the integration
+			kubectxStart := strings.Index(integration, "kubectx() {")
+			if kubectxStart == -1 {
+				t.Fatal("kubectx function not found in integration")
+			}
+
+			// Find the end of the kubectx function (next closing brace at start of line)
+			kubectxEnd := strings.Index(integration[kubectxStart:], "\n}")
+			if kubectxEnd == -1 {
+				t.Fatal("kubectx function end not found")
+			}
+			kubectxFunc := integration[kubectxStart : kubectxStart+kubectxEnd+2]
+
+			// Verify that "command kubectx" appears BEFORE "record-activity" in the function
+			cmdKubectxPos := strings.Index(kubectxFunc, "command kubectx")
+			recordActivityPos := strings.Index(kubectxFunc, "record-activity")
+
+			if cmdKubectxPos == -1 {
+				t.Error("kubectx function should contain 'command kubectx'")
+			}
+			if recordActivityPos == -1 {
+				t.Error("kubectx function should contain 'record-activity'")
+			}
+
+			// This is the key test: record-activity must come AFTER command kubectx
+			if cmdKubectxPos > recordActivityPos {
+				t.Errorf("kubectx wrapper has incorrect order: record-activity (%d) should come AFTER command kubectx (%d)\n"+
+					"This causes a race condition where the old context is recorded instead of the new one.\n"+
+					"Function:\n%s",
+					recordActivityPos, cmdKubectxPos, kubectxFunc)
+			}
+
+			// Verify that we capture and return the exit code
+			if !strings.Contains(kubectxFunc, "exit_code") && !strings.Contains(kubectxFunc, "return") {
+				t.Error("kubectx wrapper should preserve exit code from command kubectx")
 			}
 		})
 	}

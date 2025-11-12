@@ -24,20 +24,27 @@ func TestNewContextSwitcher(t *testing.T) {
 }
 
 func TestListContexts(t *testing.T) {
+	// Setup isolated test environment to avoid leaking real context names
+	tmpDir := t.TempDir()
+	restoreKubeconfig := setupTestKubeconfig(t, tmpDir)
+	defer restoreKubeconfig()
+
 	logger := log.New(os.Stdout, "[test] ", log.LstdFlags)
 	cs := NewContextSwitcher(logger)
 
-	// This test will only pass if kubectl is installed and configured
 	contexts, err := cs.ListContexts()
-
 	if err != nil {
-		t.Logf("ListContexts failed (expected if kubectl not configured): %v", err)
-		t.Skip("Skipping test - kubectl not available or configured")
+		t.Fatalf("ListContexts failed: %v", err)
 	}
 
 	if len(contexts) == 0 {
-		t.Log("Warning: No contexts found (kubectl might not be configured)")
-		t.Skip("Skipping test - no kubectl contexts configured")
+		t.Fatal("No contexts found from isolated kubeconfig")
+	}
+
+	// Verify we got test contexts from isolated kubeconfig
+	expectedContexts := []string{"test-default", "test-prod", "test-stage"}
+	if len(contexts) != len(expectedContexts) {
+		t.Errorf("Expected %d contexts, got %d", len(expectedContexts), len(contexts))
 	}
 
 	t.Logf("Found %d contexts", len(contexts))
@@ -47,24 +54,18 @@ func TestListContexts(t *testing.T) {
 }
 
 func TestValidateContext(t *testing.T) {
+	// Setup isolated test environment to avoid leaking real context names
+	tmpDir := t.TempDir()
+	restoreKubeconfig := setupTestKubeconfig(t, tmpDir)
+	defer restoreKubeconfig()
+
 	logger := log.New(os.Stdout, "[test] ", log.LstdFlags)
 	cs := NewContextSwitcher(logger)
 
-	// Get list of contexts first
-	contexts, err := cs.ListContexts()
+	// Test validating an existing context from isolated kubeconfig
+	err := cs.ValidateContext("test-default")
 	if err != nil {
-		t.Skip("Skipping test - kubectl not available")
-	}
-
-	if len(contexts) == 0 {
-		t.Skip("Skipping test - no contexts configured")
-	}
-
-	// Test validating an existing context (use the first one)
-	firstContext := contexts[0]
-	err = cs.ValidateContext(firstContext)
-	if err != nil {
-		t.Errorf("ValidateContext failed for existing context '%s': %v", firstContext, err)
+		t.Errorf("ValidateContext failed for existing context 'test-default': %v", err)
 	}
 
 	// Test validating a non-existent context
@@ -75,17 +76,19 @@ func TestValidateContext(t *testing.T) {
 }
 
 func TestSwitchContextSameContext(t *testing.T) {
+	// Setup isolated test environment
+	tmpDir := t.TempDir()
+	restoreKubeconfig := setupTestKubeconfig(t, tmpDir)
+	defer restoreKubeconfig()
+
 	logger := log.New(os.Stdout, "[test] ", log.LstdFlags)
 	cs := NewContextSwitcher(logger)
 
-	// Get current context
-	currentContext, err := GetCurrentContext()
-	if err != nil {
-		t.Skip("Skipping test - kubectl not available")
-	}
+	// Use test context from isolated kubeconfig
+	currentContext := "test-default"
 
 	// Try to switch to the same context (should be no-op)
-	err = cs.SwitchContext(currentContext)
+	err := cs.SwitchContext(currentContext)
 	if err != nil {
 		t.Errorf("SwitchContext failed when switching to same context: %v", err)
 	}
@@ -113,19 +116,21 @@ func TestSwitchContextNonExistent(t *testing.T) {
 }
 
 func TestSwitchContextSafe(t *testing.T) {
+	// Setup isolated test environment
+	tmpDir := t.TempDir()
+	restoreKubeconfig := setupTestKubeconfig(t, tmpDir)
+	defer restoreKubeconfig()
+
 	logger := log.New(os.Stdout, "[test] ", log.LstdFlags)
 	cs := NewContextSwitcher(logger)
 
-	// Get current context
-	currentContext, err := GetCurrentContext()
-	if err != nil {
-		t.Skip("Skipping test - kubectl not available")
-	}
+	// Use test context from isolated kubeconfig
+	currentContext := "test-default"
 
 	// Test with never_switch_to list containing the target context
 	neverSwitchTo := []string{"production", "prod", currentContext}
 
-	err = cs.SwitchContextSafe(currentContext, neverSwitchTo)
+	err := cs.SwitchContextSafe(currentContext, neverSwitchTo)
 	if err == nil {
 		t.Error("SwitchContextSafe should have failed when target is in never_switch_to list")
 	}
@@ -136,38 +141,22 @@ func TestSwitchContextSafe(t *testing.T) {
 }
 
 func TestSwitchContextWithRetry(t *testing.T) {
+	// Setup isolated test environment
+	tmpDir := t.TempDir()
+	restoreKubeconfig := setupTestKubeconfig(t, tmpDir)
+	defer restoreKubeconfig()
+
 	logger := log.New(os.Stdout, "[test] ", log.LstdFlags)
 	cs := NewContextSwitcher(logger)
 
-	// Get list of contexts
-	contexts, err := cs.ListContexts()
-	if err != nil || len(contexts) < 2 {
-		t.Skip("Skipping test - need at least 2 kubectl contexts")
-	}
-
-	// Get current context
-	currentContext, err := GetCurrentContext()
-	if err != nil {
-		t.Skip("Skipping test - kubectl not available")
-	}
-
-	// Find a different context to switch to
-	var targetContext string
-	for _, ctx := range contexts {
-		if ctx != currentContext {
-			targetContext = ctx
-			break
-		}
-	}
-
-	if targetContext == "" {
-		t.Skip("Skipping test - no alternative context available")
-	}
+	// Use test contexts from isolated kubeconfig
+	currentContext := "test-default"
+	targetContext := "test-prod"
 
 	t.Logf("Testing context switch from '%s' to '%s'", currentContext, targetContext)
 
 	// Perform the switch
-	err = cs.SwitchContext(targetContext)
+	err := cs.SwitchContext(targetContext)
 	if err != nil {
 		t.Fatalf("SwitchContext failed: %v", err)
 	}

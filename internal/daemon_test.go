@@ -11,6 +11,10 @@ import (
 func TestNewDaemon(t *testing.T) {
 	// Create temp directory for test files
 	tmpDir := t.TempDir()
+	// Setup isolated test environment to avoid leaking real context names
+	restoreKubeconfig := setupTestKubeconfig(t, tmpDir)
+	defer restoreKubeconfig()
+
 	configPath := filepath.Join(tmpDir, "config.yaml")
 	statePath := filepath.Join(tmpDir, "state.json")
 
@@ -19,7 +23,7 @@ func TestNewDaemon(t *testing.T) {
 timeout:
   default: 30m
   check_interval: 30s
-default_context: test-context
+default_context: test-default
 daemon:
   enabled: true
   log_level: info
@@ -64,6 +68,10 @@ func TestNewDaemon_InvalidConfig(t *testing.T) {
 
 func TestDaemonShutdown(t *testing.T) {
 	tmpDir := t.TempDir()
+	// Setup isolated test environment to avoid leaking real context names
+	restoreKubeconfig := setupTestKubeconfig(t, tmpDir)
+	defer restoreKubeconfig()
+
 	configPath := filepath.Join(tmpDir, "config.yaml")
 	statePath := filepath.Join(tmpDir, "state.json")
 
@@ -71,7 +79,7 @@ func TestDaemonShutdown(t *testing.T) {
 timeout:
   default: 30m
   check_interval: 1s
-default_context: test-context
+default_context: test-default
 daemon:
   enabled: true
   log_level: info
@@ -117,6 +125,11 @@ func TestDaemonReloadConfig(t *testing.T) {
 	// Note: ReloadConfig currently hardcodes the config path to ~/.kubectx-timeout/config.yaml
 	// This test creates that file if possible, but skips if it can't
 
+	// Setup isolated test environment to avoid leaking real context names
+	tmpDir := t.TempDir()
+	restoreKubeconfig := setupTestKubeconfig(t, tmpDir)
+	defer restoreKubeconfig()
+
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
 		t.Skip("Cannot get home directory, skipping ReloadConfig test")
@@ -138,14 +151,13 @@ func TestDaemonReloadConfig(t *testing.T) {
 	originalConfig, _ := os.ReadFile(configPath)
 	hasOriginal := originalConfig != nil
 
-	tmpDir := t.TempDir()
 	statePath := filepath.Join(tmpDir, "state.json")
 
 	configContent := `
 timeout:
   default: 30m
   check_interval: 30s
-default_context: test-context
+default_context: test-default
 daemon:
   enabled: true
   log_level: info
@@ -176,7 +188,7 @@ safety:
 timeout:
   default: 60m
   check_interval: 30s
-default_context: new-test-context
+default_context: test-prod
 daemon:
   enabled: true
   log_level: debug
@@ -199,14 +211,15 @@ safety:
 // Regression test for bug where daemon immediately switches on startup with stale state
 func TestDaemonStartupWithStaleState(t *testing.T) {
 	tmpDir := t.TempDir()
+	// Setup isolated test environment to avoid leaking real context names
+	restoreKubeconfig := setupTestKubeconfig(t, tmpDir)
+	defer restoreKubeconfig()
+
 	configPath := filepath.Join(tmpDir, "config.yaml")
 	statePath := filepath.Join(tmpDir, "state.json")
 
-	// Get current context
-	currentContext, err := GetCurrentContext()
-	if err != nil {
-		t.Skip("Skipping test - kubectl not available")
-	}
+	// Use test context from isolated kubeconfig
+	currentContext := "test-default"
 
 	// Create config
 	configContent := `
@@ -270,14 +283,15 @@ safety:
 func TestDaemonStartupWithStaleTimestamp(t *testing.T) {
 	// Create temp directories
 	configDir := t.TempDir()
+	// Setup isolated test environment to avoid leaking real context names
+	restoreKubeconfig := setupTestKubeconfig(t, configDir)
+	defer restoreKubeconfig()
+
 	configPath := filepath.Join(configDir, "config.yaml")
 	statePath := filepath.Join(configDir, "state.json")
 
-	// Get current context
-	currentContext, err := GetCurrentContext()
-	if err != nil {
-		t.Skip("Skipping test - kubectl not available")
-	}
+	// Use test context from isolated kubeconfig
+	currentContext := "test-default"
 
 	// Write config
 	configContent := fmt.Sprintf(`
@@ -343,14 +357,15 @@ daemon:
 func TestDaemonStartupWithZeroTimestamp(t *testing.T) {
 	// Create temp directories
 	configDir := t.TempDir()
+	// Setup isolated test environment to avoid leaking real context names
+	restoreKubeconfig := setupTestKubeconfig(t, configDir)
+	defer restoreKubeconfig()
+
 	configPath := filepath.Join(configDir, "config.yaml")
 	statePath := filepath.Join(configDir, "state.json")
 
-	// Get current context
-	currentContext, err := GetCurrentContext()
-	if err != nil {
-		t.Skip("Skipping test - kubectl not available")
-	}
+	// Use test context from isolated kubeconfig
+	currentContext := "test-default"
 
 	// Write config
 	configContent := fmt.Sprintf(`

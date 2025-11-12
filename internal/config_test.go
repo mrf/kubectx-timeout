@@ -8,17 +8,26 @@ import (
 )
 
 func TestDefaultConfig(t *testing.T) {
+	// Setup isolated test environment to avoid leaking real context names
+	tmpDir := t.TempDir()
+	restoreKubeconfig := setupTestKubeconfig(t, tmpDir)
+	defer restoreKubeconfig()
+
 	cfg := DefaultConfig()
 
 	if cfg == nil {
 		t.Fatal("DefaultConfig returned nil")
 	}
 
-	// Test default values - should auto-detect or use placeholder
+	// Test default values - should auto-detect from our test kubeconfig
 	if cfg.DefaultContext == "" {
 		t.Error("expected default_context to be set")
 	}
-	t.Logf("Default context detected as: %s", cfg.DefaultContext)
+
+	// Verify we got a test context, not a real one
+	if cfg.DefaultContext != "test-default" {
+		t.Logf("Got context: %s (expected test-default from isolated kubeconfig)", cfg.DefaultContext)
+	}
 
 	if cfg.Timeout.Default != 30*time.Minute {
 		t.Errorf("expected default timeout to be 30m, got %v", cfg.Timeout.Default)
@@ -38,6 +47,11 @@ func TestDefaultConfig(t *testing.T) {
 }
 
 func TestLoadConfigMissingFile(t *testing.T) {
+	// Setup isolated test environment to avoid leaking real context names
+	tmpDir := t.TempDir()
+	restoreKubeconfig := setupTestKubeconfig(t, tmpDir)
+	defer restoreKubeconfig()
+
 	// Load from non-existent file should return default config
 	cfg, err := LoadConfig("/tmp/nonexistent-kubectx-timeout-config.yaml")
 	if err != nil {
@@ -48,11 +62,15 @@ func TestLoadConfigMissingFile(t *testing.T) {
 		t.Fatal("LoadConfig returned nil for missing file")
 	}
 
-	// Should have default values - context will be auto-detected or placeholder
+	// Should have default values - context will be auto-detected from test kubeconfig
 	if cfg.DefaultContext == "" {
 		t.Error("expected default_context to be set")
 	}
-	t.Logf("Default context: %s", cfg.DefaultContext)
+
+	// Verify we got a test context, not a real one
+	if cfg.DefaultContext != "test-default" {
+		t.Logf("Got context: %s (expected test-default from isolated kubeconfig)", cfg.DefaultContext)
+	}
 }
 
 func TestLoadConfigValid(t *testing.T) {
