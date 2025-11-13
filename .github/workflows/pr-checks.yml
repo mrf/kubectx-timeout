@@ -56,6 +56,9 @@ jobs:
           go install honnef.co/go/tools/cmd/staticcheck@latest
           staticcheck ./...
 
+      - name: Install kubectl for integration tests
+        uses: azure/setup-kubectl@v4
+
       - name: Run tests with race detector
         run: go test -race -v -coverprofile=coverage.out ./...
 
