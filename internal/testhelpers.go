@@ -61,9 +61,13 @@ users:
 	// Return cleanup function
 	return func() {
 		if originalKubeconfig != "" {
-			os.Setenv("KUBECONFIG", originalKubeconfig)
+			if err := os.Setenv("KUBECONFIG", originalKubeconfig); err != nil {
+				t.Errorf("Failed to restore KUBECONFIG: %v", err)
+			}
 		} else {
-			os.Unsetenv("KUBECONFIG")
+			if err := os.Unsetenv("KUBECONFIG"); err != nil {
+				t.Errorf("Failed to unset KUBECONFIG: %v", err)
+			}
 		}
 		t.Logf("Restored original KUBECONFIG")
 	}
