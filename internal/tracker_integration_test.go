@@ -23,6 +23,11 @@ func TestKubectlWrapperIntegration(t *testing.T) {
 	shells := []string{"bash", "zsh"}
 	for _, shell := range shells {
 		t.Run(shell, func(t *testing.T) {
+			// Check if shell is available
+			if _, err := exec.LookPath(shell); err != nil {
+				t.Skipf("Skipping test: %s not found in PATH", shell)
+			}
+
 			// Setup isolated test environment (auto-cleaned on test completion)
 			tmpDir := t.TempDir()
 
@@ -149,6 +154,11 @@ func TestKubectxWrapperIntegrationSuccess(t *testing.T) {
 	shells := []string{"bash", "zsh"}
 	for _, shell := range shells {
 		t.Run(shell, func(t *testing.T) {
+			// Check if shell is available
+			if _, err := exec.LookPath(shell); err != nil {
+				t.Skipf("Skipping test: %s not found in PATH", shell)
+			}
+
 			// Setup isolated test environment
 			tmpDir := t.TempDir()
 
@@ -288,6 +298,11 @@ func TestKubectxWrapperIntegrationFailure(t *testing.T) {
 	shells := []string{"bash", "zsh"}
 	for _, shell := range shells {
 		t.Run(shell, func(t *testing.T) {
+			// Check if shell is available
+			if _, err := exec.LookPath(shell); err != nil {
+				t.Skipf("Skipping test: %s not found in PATH", shell)
+			}
+
 			// Setup isolated test environment
 			tmpDir := t.TempDir()
 
