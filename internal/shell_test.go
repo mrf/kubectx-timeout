@@ -92,9 +92,18 @@ func TestGetShellProfilePath(t *testing.T) {
 		expectError  bool
 	}{
 		{
-			shell:        ShellBash,
-			expectedPath: filepath.Join(home, ".bashrc"),
-			expectError:  false,
+			shell: ShellBash,
+			// For bash, we need to check what actually exists
+			// The function prefers .bash_profile over .bashrc
+			expectedPath: func() string {
+				bashProfile := filepath.Join(home, ".bash_profile")
+				bashrc := filepath.Join(home, ".bashrc")
+				if _, err := os.Stat(bashProfile); err == nil {
+					return bashProfile
+				}
+				return bashrc
+			}(),
+			expectError: false,
 		},
 		{
 			shell:        ShellZsh,
@@ -126,6 +135,87 @@ func TestGetShellProfilePath(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestGetShellProfilePathBashPreference specifically tests the bash profile preference logic
+// This test validates that .bash_profile is preferred over .bashrc when both exist
+func TestGetShellProfilePathBashPreference(t *testing.T) {
+	// Save original HOME
+	originalHome := os.Getenv("HOME")
+	defer os.Setenv("HOME", originalHome)
+
+	tests := []struct {
+		name           string
+		createFiles    []string
+		expectedSuffix string
+		description    string
+	}{
+		{
+			name:           "bash_profile exists alone",
+			createFiles:    []string{".bash_profile"},
+			expectedSuffix: ".bash_profile",
+			description:    "Should return .bash_profile when only it exists",
+		},
+		{
+			name:           "bashrc exists alone",
+			createFiles:    []string{".bashrc"},
+			expectedSuffix: ".bashrc",
+			description:    "Should return .bashrc when only it exists",
+		},
+		{
+			name:           "both files exist",
+			createFiles:    []string{".bash_profile", ".bashrc"},
+			expectedSuffix: ".bash_profile",
+			description:    "Should prefer .bash_profile when both exist",
+		},
+		{
+			name:           "neither file exists",
+			createFiles:    []string{},
+			expectedSuffix: ".bashrc",
+			description:    "Should return .bashrc as fallback when neither exists",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create fresh temp directory for this test case
+			testHome, err := os.MkdirTemp("", "bash-test-*")
+			if err != nil {
+				t.Fatalf("Failed to create test home dir: %v", err)
+			}
+			defer os.RemoveAll(testHome)
+
+			// Set HOME to test directory
+			os.Setenv("HOME", testHome)
+
+			// Create the specified files
+			for _, filename := range tt.createFiles {
+				filePath := filepath.Join(testHome, filename)
+				if err := os.WriteFile(filePath, []byte("# test content"), 0644); err != nil {
+					t.Fatalf("Failed to create %s: %v", filename, err)
+				}
+			}
+
+			// Call the function
+			result, err := GetShellProfilePath(ShellBash)
+			if err != nil {
+				t.Fatalf("Unexpected error: %v", err)
+			}
+
+			// Verify the result
+			expectedPath := filepath.Join(testHome, tt.expectedSuffix)
+			if result != expectedPath {
+				t.Errorf("%s\nExpected: %s\nGot:      %s", tt.description, expectedPath, result)
+			}
+
+			// Log for clarity
+			t.Logf("Test: %s\nCreated: %v\nReturned: %s",
+				tt.description, tt.createFiles, filepath.Base(result))
+		})
+	}
+
+	// Restore original HOME
+	os.Setenv("HOME", originalHome)
 }
 
 func TestGetShellIntegrationCode(t *testing.T) {
