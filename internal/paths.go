@@ -51,3 +51,21 @@ func GetStatePath() string {
 func GetLogPath() string {
 	return filepath.Join(GetStateDir(), "daemon.log")
 }
+
+// GetKubeconfigPath returns the path to the kubeconfig file.
+// Returns $KUBECONFIG if set, otherwise ~/.kube/config
+func GetKubeconfigPath() string {
+	if kubeconfigEnv := os.Getenv("KUBECONFIG"); kubeconfigEnv != "" {
+		// KUBECONFIG can contain multiple paths separated by colons
+		// We only watch the first one as it has the highest precedence
+		return filepath.SplitList(kubeconfigEnv)[0]
+	}
+
+	home, err := os.UserHomeDir()
+	if err != nil {
+		// Fallback if we can't get home directory
+		return filepath.Join("/tmp", ".kube", "config")
+	}
+
+	return filepath.Join(home, ".kube", "config")
+}
