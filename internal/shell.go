@@ -43,6 +43,7 @@ func DetectShell() (string, error) {
 	// Try to detect from parent process
 	ppid := os.Getppid()
 	if ppid > 0 {
+		// #nosec G204 -- ppid is from os.Getppid() system call, formatted as %d, not user input
 		cmd := exec.Command("ps", "-p", fmt.Sprintf("%d", ppid), "-o", "comm=")
 		output, err := cmd.Output()
 		if err == nil {
@@ -152,6 +153,7 @@ end
 
 // IsIntegrationInstalled checks if the integration is already installed
 func IsIntegrationInstalled(profilePath string) (bool, error) {
+	// #nosec G304 -- profilePath is constructed from user home dir and known profile names, not user input
 	file, err := os.Open(profilePath)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -189,13 +191,14 @@ func InstallIntegration(profilePath string, integrationCode string) error {
 
 	// Ensure profile directory exists
 	profileDir := filepath.Dir(profilePath)
-	if err := os.MkdirAll(profileDir, 0755); err != nil {
+	if err := os.MkdirAll(profileDir, 0750); err != nil {
 		return fmt.Errorf("failed to create profile directory: %w", err)
 	}
 
 	// Create backup
 	backupPath := profilePath + ".kubectx-timeout.backup"
 	if _, err := os.Stat(profilePath); err == nil {
+		// #nosec G304 -- profilePath is constructed from user home dir and known profile names, not user input
 		content, err := os.ReadFile(profilePath)
 		if err != nil {
 			return fmt.Errorf("failed to read profile for backup: %w", err)
@@ -206,6 +209,7 @@ func InstallIntegration(profilePath string, integrationCode string) error {
 	}
 
 	// Append integration code
+	// #nosec G304 -- profilePath is constructed from user home dir and known profile names, not user input
 	file, err := os.OpenFile(profilePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
 	if err != nil {
 		return fmt.Errorf("failed to open profile: %w", err)
@@ -223,6 +227,7 @@ func InstallIntegration(profilePath string, integrationCode string) error {
 
 // UninstallIntegration removes the shell integration from the profile file
 func UninstallIntegration(profilePath string) error {
+	// #nosec G304 -- profilePath is constructed from user home dir and known profile names, not user input
 	file, err := os.Open(profilePath)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -267,6 +272,7 @@ func UninstallIntegration(profilePath string) error {
 
 	// Create backup
 	backupPath := profilePath + ".kubectx-timeout.backup"
+	// #nosec G304 -- profilePath is constructed from user home dir and known profile names, not user input
 	content, err := os.ReadFile(profilePath)
 	if err != nil {
 		return fmt.Errorf("failed to read profile for backup: %w", err)

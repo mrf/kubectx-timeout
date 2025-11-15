@@ -91,7 +91,9 @@ func cmdDaemon() {
 	configPath := fs.String("config", defaultConfigPath, "Path to configuration file")
 	statePath := fs.String("state", defaultStatePath, "Path to state file")
 
-	fs.Parse(os.Args[2:])
+	if err := fs.Parse(os.Args[2:]); err != nil {
+		log.Fatalf("Failed to parse flags: %v", err)
+	}
 
 	// Create daemon
 	daemon, err := internal.NewDaemon(*configPath, *statePath)
@@ -110,7 +112,9 @@ func cmdInit() {
 
 	fs := flag.NewFlagSet("init", flag.ExitOnError)
 	configPath := fs.String("config", defaultConfigPath, "Path to configuration file")
-	fs.Parse(os.Args[2:])
+	if err := fs.Parse(os.Args[2:]); err != nil {
+		log.Fatalf("Failed to parse flags: %v", err)
+	}
 
 	if err := initializeConfig(*configPath); err != nil {
 		log.Fatalf("Failed to initialize configuration: %v", err)
@@ -238,7 +242,9 @@ func cmdInstallShell() {
 	noReload := fs.Bool("no-reload", false, "Don't offer to reload shell")
 	binaryPath := fs.String("binary", defaultBinaryPath, "Path to kubectx-timeout binary")
 
-	fs.Parse(os.Args[2:])
+	if err := fs.Parse(os.Args[2:]); err != nil {
+		log.Fatalf("Failed to parse flags: %v", err)
+	}
 
 	// Determine shell
 	var targetShell string
@@ -359,7 +365,9 @@ func cmdUninstallShell() {
 	fs := flag.NewFlagSet("uninstall-shell", flag.ExitOnError)
 	noConfirm := fs.Bool("yes", false, "Skip confirmation prompts")
 
-	fs.Parse(os.Args[2:])
+	if err := fs.Parse(os.Args[2:]); err != nil {
+		log.Fatalf("Failed to parse flags: %v", err)
+	}
 
 	// Determine shell
 	var targetShell string
@@ -435,7 +443,9 @@ func cmdRecordActivity() {
 	fs := flag.NewFlagSet("record-activity", flag.ExitOnError)
 	statePath := fs.String("state", defaultStatePath, "Path to state file")
 	configPath := fs.String("config", defaultConfigPath, "Path to configuration file")
-	fs.Parse(os.Args[2:])
+	if err := fs.Parse(os.Args[2:]); err != nil {
+		log.Fatalf("Failed to parse flags: %v", err)
+	}
 
 	// Create activity tracker
 	tracker, err := internal.NewActivityTracker(*statePath, *configPath)
