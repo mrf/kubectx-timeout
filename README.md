@@ -2,6 +2,8 @@
 
 A macOS daemon that automatically switches your kubectl context to a safe default after a period of inactivity, preventing accidental commands against production clusters.
 
+[![Go Report Card](https://goreportcard.com/badge/github.com/mrf/kubectx-timeout)](https://goreportcard.com/report/github.com/mrf/kubectx-timeout)
+
 ## Overview
 
 Have you ever forgotten you were in a production kubectl context and run a potentially dangerous command? `kubectx-timeout` solves this by monitoring your kubectl activity and automatically switching to a safe default context after a configurable timeout period.
@@ -18,51 +20,151 @@ Have you ever forgotten you were in a production kubectl context and run a poten
 
 1. A shell wrapper tracks kubectl command activity by writing timestamps to a state file
 2. A background daemon monitors this activity via a periodic check
-3. When inactivity exceeds the configured timeout, the daemon switches to your default safe context
-4. You're notified of the switch and can continue working safely
+3. **Optional**: File system monitoring (fswatch) detects context switches from any tool
+4. When inactivity exceeds the configured timeout, the daemon switches to your default safe context
+5. You're notified of the switch and can continue working safely
 
 ## Installation
 
-### From Source
+### Quick Start
 
 ```bash
-# Clone the repository
+# 1. Clone and build
 git clone https://github.com/YOUR-USERNAME/kubectx-timeout.git
 cd kubectx-timeout
-
-# Build the binary
 make build
 
-# Install to /usr/local/bin
+# 2. Install binary
 sudo cp bin/kubectx-timeout /usr/local/bin/
 
-# Initialize configuration
-kubectx-timeout init
-```
-
-### Quick Setup
-
-After installation, run the interactive setup:
-
-```bash
-# 1. Run the initialization wizard (guided setup)
+# 3. Initialize configuration (interactive, selects your safe default context)
 kubectx-timeout init
 
-# 2. Install shell integration
-kubectx-timeout install-shell bash  # or zsh
+# 4. Install shell integration (auto-detects your shell: bash/zsh/fish)
+kubectx-timeout install-shell
 
-# 3. Restart your shell or source your profile
+# 5. Install and start the daemon (macOS launchd)
+kubectx-timeout install-daemon
+kubectx-timeout start-daemon
+
+# 6. (Optional but recommended) Install fswatch for automatic context switch detection
+brew install fswatch
+
+# 7. Restart your shell
 source ~/.bashrc  # or ~/.zshrc
 
-# 4. Start using kubectl - activity is now tracked!
+# You're done! kubectl activity is now tracked.
+```
+
+### Installation Steps Explained
+
+#### 1. Build and Install Binary
+
+```bash
+make build
+sudo cp bin/kubectx-timeout /usr/local/bin/
+```
+
+#### 2. Initialize Configuration
+
+The `init` command creates an interactive configuration file:
+
+```bash
+kubectx-timeout init
+```
+
+This will:
+- Show available kubectl contexts
+- Let you select a safe default context
+- Create `~/.config/kubectx-timeout/config.yaml` with sensible defaults
+
+#### 3. Install Shell Integration
+
+The shell integration wraps kubectl to track activity:
+
+```bash
+# Auto-detect current shell
+kubectx-timeout install-shell
+
+# Or specify shell explicitly
+kubectx-timeout install-shell bash
+kubectx-timeout install-shell zsh
+kubectx-timeout install-shell fish
+```
+
+This modifies your shell profile (`.bashrc`, `.zshrc`, or `config.fish`) to wrap kubectl commands.
+
+#### 4. Set Up Daemon (macOS)
+
+Install the launchd agent for automatic daemon startup:
+
+```bash
+# Install daemon configuration
+kubectx-timeout install-daemon
+
+# Start the daemon
+kubectx-timeout start-daemon
+
+# Check daemon status
+kubectx-timeout daemon-status
+```
+
+**Other daemon commands:**
+- `kubectx-timeout stop-daemon` - Stop the daemon
+- `kubectx-timeout restart-daemon` - Restart the daemon
+- `kubectx-timeout uninstall-daemon` - Remove daemon configuration
+
+**Manual daemon control** (if not using launchd):
+```bash
+# Run in foreground (for testing)
+kubectx-timeout daemon
+
+# Run in background
+kubectx-timeout daemon &
+```
+
+### Verification
+
+After installation, verify everything is working:
+
+```bash
+# Check the binary is installed
+kubectx-timeout version
+
+# Run a kubectl command (activity will be tracked)
 kubectl get pods
 
-# 5. Check status
-kubectx-timeout status
+# Check daemon status
+kubectx-timeout daemon-status
 
-# 6. (Optional) Run daemon in foreground to test
-kubectx-timeout daemon
+# View logs
+tail -f ~/.local/state/kubectx-timeout/daemon.log
 ```
+
+### Uninstallation
+
+The CLI provides a complete uninstallation command:
+
+```bash
+# Interactive uninstallation (keeps binary and config by default)
+kubectx-timeout uninstall
+
+# Complete removal including binary
+kubectx-timeout uninstall --all
+
+# Remove everything but keep configuration files
+kubectx-timeout uninstall --all --keep-config
+
+# Non-interactive (useful for scripts)
+kubectx-timeout uninstall --all --yes
+```
+
+The uninstall command will:
+1. Stop and remove the launchd daemon
+2. Remove shell integration from all detected shells
+3. Optionally remove configuration and state files
+4. Optionally remove the binary (with `--all`)
+5. Clean up backup files
 
 ## Configuration
 
@@ -228,16 +330,62 @@ The state file is a simple JSON file:
 }
 ```
 
+### File System Monitoring (Optional)
+
+For enhanced detection of context switches made outside the shell wrapper (e.g., IDE plugins, GUI tools, direct kubeconfig edits), `kubectx-timeout` supports **fswatch-based monitoring** on macOS.
+
+#### How It Works
+
+When fswatch is installed, the daemon:
+1. Monitors `~/.kube/config` (or `$KUBECONFIG` path) for file modifications
+2. Uses the macOS FSEvents API for efficient, low-overhead file watching
+3. Detects context switches from ANY tool that modifies the kubeconfig
+4. Automatically records activity and resets the timeout when a context change is detected
+
+#### Installing fswatch
+
+```bash
+# macOS (Homebrew)
+brew install fswatch
+```
+
+After installation, restart the daemon to enable file monitoring:
+
+```bash
+kubectx-timeout restart-daemon
+```
+
+#### Behavior
+
+- **If fswatch is available**: Automatic monitoring is enabled at daemon startup
+- **If fswatch is not installed**: Daemon continues to work normally using only shell-wrapper-based detection
+- **Graceful degradation**: The daemon logs an informative message and continues without file monitoring
+
+The file watcher runs in a separate goroutine alongside the periodic timeout checker, providing comprehensive coverage:
+- **Shell wrapper**: Detects kubectl commands
+- **File monitoring**: Detects context switches from IDE plugins, kubectx, GUI tools, manual edits
+
+#### Platform Support
+
+File system monitoring is currently **macOS-only** as it uses the FSEvents API. On other platforms, the daemon will automatically skip file monitoring and rely solely on shell wrapper detection.
+
 ### Timeout Detection
 
-The daemon:
+The daemon uses a simple, efficient polling mechanism:
 1. Checks the state file every `check_interval` (default: 30 seconds)
-2. Compares current time to `last_activity`
-3. If time elapsed > timeout for current context:
+2. Uses mtime-based caching to avoid unnecessary file reads (battery optimization)
+3. Compares current time to `last_activity`
+4. If time elapsed > timeout for current context:
    - Validates the target (default) context exists
    - Checks if kubectl is currently running (optional safety check)
    - Switches to the default context using `kubectl config use-context`
    - Sends a notification (macOS notification + terminal output)
+
+**Battery Optimization**: The daemon is designed to be battery-friendly:
+- File modification time (mtime) is checked before reading the full state file
+- Cached values are used when the file hasn't changed
+- Default 30s check interval is a good balance (can be increased for longer battery life)
+- Timeout checking is not time-critical, so longer intervals (60s+) are acceptable
 
 ### Safety Features
 
@@ -333,6 +481,31 @@ kubectl config get-contexts
 tail -100 ~/.local/state/kubectx-timeout/daemon.log
 ```
 
+### File System Monitoring Not Working
+
+```bash
+# Check if fswatch is installed
+which fswatch
+fswatch --version
+
+# Install fswatch (macOS)
+brew install fswatch
+
+# Check daemon logs for fswatch status
+tail -100 ~/.local/state/kubectx-timeout/daemon.log | grep -i fswatch
+
+# Restart daemon after installing fswatch
+kubectx-timeout restart-daemon
+
+# Verify KUBECONFIG path
+echo $KUBECONFIG  # Should show path to config, or be empty (uses ~/.kube/config)
+
+# Test fswatch manually
+fswatch -1 ~/.kube/config &
+# Make a change to kubeconfig in another terminal
+# You should see output from fswatch
+```
+
 ## Development
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for contribution guidelines and [DEVELOPMENT.md](DEVELOPMENT.md) for detailed development practices.
@@ -368,6 +541,8 @@ Contributions are welcome! This is an early-stage project, so please:
 2. Check existing issues before creating new ones
 3. Follow the code standards and testing requirements
 4. Open PRs against the `main` branch
+
+For maintainers creating releases, see the [Release Process](CONTRIBUTING.md#release-process) section in CONTRIBUTING.md and [VERSIONING.md](VERSIONING.md) for versioning strategy.
 
 ## License
 

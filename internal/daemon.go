@@ -136,6 +136,16 @@ func (d *Daemon) Run() error {
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM, syscall.SIGHUP)
 
+	// Start kubeconfig file watcher in separate goroutine
+	// This provides backup detection for context switches from any tool
+	watcher, err := NewKubeconfigWatcher(d.stateManager, d.logger, d.ctx)
+	if err != nil {
+		d.logger.Printf("Warning: failed to create kubeconfig watcher: %v", err)
+		// Don't fail daemon startup, just log warning and continue without file monitoring
+	} else {
+		go watcher.Watch()
+	}
+
 	// Main event loop
 	for {
 		select {
