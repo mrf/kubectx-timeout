@@ -102,7 +102,7 @@ func GetShellProfilePath(shell string) (string, error) {
 // GetShellIntegrationCode returns the shell integration code for the given shell
 func GetShellIntegrationCode(shell string, binaryPath string) (string, error) {
 	switch shell {
-	case ShellBash, ShellZsh:
+	case ShellBash:
 		return fmt.Sprintf(`%s
 # Function-based kubectl wrapper
 # This is lighter weight than aliasing to a script
@@ -126,6 +126,30 @@ kubectl() {
 
 # Export for use in subshells
 export -f _kubectx_timeout_kubectl 2>/dev/null || true
+%s
+`, IntegrationStartMarker, binaryPath, IntegrationEndMarker), nil
+
+	case ShellZsh:
+		return fmt.Sprintf(`%s
+# Function-based kubectl wrapper
+# This is lighter weight than aliasing to a script
+_kubectx_timeout_kubectl() {
+    local kubectx_timeout_bin="${KUBECTX_TIMEOUT_BIN:-%s}"
+
+    # Record activity in background (non-blocking)
+    if [ -x "$kubectx_timeout_bin" ]; then
+        "$kubectx_timeout_bin" record-activity >/dev/null 2>&1 &
+    fi
+
+    # Execute kubectl with all arguments
+    command kubectl "$@"
+}
+
+# Create kubectl alias/function
+# Use a function instead of alias for better compatibility
+kubectl() {
+    _kubectx_timeout_kubectl "$@"
+}
 %s
 `, IntegrationStartMarker, binaryPath, IntegrationEndMarker), nil
 
