@@ -2,14 +2,33 @@ package internal
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
+	"runtime"
 	"testing"
 	"time"
 )
 
+// requireFswatch skips the test if fswatch is not available or not on macOS
+// fswatch is required for file monitoring tests and only works on macOS
+func requireFswatch(t *testing.T) {
+	t.Helper()
+
+	// Check if we're on macOS
+	if runtime.GOOS != "darwin" {
+		t.Skip("fswatch file monitoring only works on macOS (requires FSEvents API)")
+	}
+
+	// Check if fswatch is installed
+	if _, err := exec.LookPath("fswatch"); err != nil {
+		t.Skip("fswatch not installed - install with: brew install fswatch")
+	}
+}
+
 // TestWatchKubeconfigDetectsChanges verifies that the file watcher detects
 // context changes when the kubeconfig file is modified
 func TestWatchKubeconfigDetectsChanges(t *testing.T) {
+	requireFswatch(t)
 	tmpDir := t.TempDir()
 	restoreKubeconfig := setupTestKubeconfig(t, tmpDir)
 	defer restoreKubeconfig()
@@ -134,6 +153,7 @@ users:
 // TestWatchKubeconfigIgnoresSameContext verifies that the file watcher
 // doesn't record spurious activity when the file changes but context stays the same
 func TestWatchKubeconfigIgnoresSameContext(t *testing.T) {
+	requireFswatch(t)
 	tmpDir := t.TempDir()
 	restoreKubeconfig := setupTestKubeconfig(t, tmpDir)
 	defer restoreKubeconfig()
@@ -321,6 +341,7 @@ safety:
 // TestWatchKubeconfigHandlesFileRecreation verifies that the watcher
 // can handle the kubeconfig file being removed and recreated
 func TestWatchKubeconfigHandlesFileRecreation(t *testing.T) {
+	requireFswatch(t)
 	tmpDir := t.TempDir()
 	restoreKubeconfig := setupTestKubeconfig(t, tmpDir)
 	defer restoreKubeconfig()
