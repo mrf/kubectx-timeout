@@ -150,9 +150,10 @@ users:
 	}
 }
 
-// TestWatchKubeconfigIgnoresSameContext verifies that the file watcher
-// doesn't record spurious activity when the file changes but context stays the same
-func TestWatchKubeconfigIgnoresSameContext(t *testing.T) {
+// TestWatchKubeconfigExtendsTimeoutOnModification verifies that the file watcher
+// records activity when the kubeconfig is modified, even if context stays the same
+// This is intentional - any kubeconfig modification indicates K8s activity and should extend timeout
+func TestWatchKubeconfigExtendsTimeoutOnModification(t *testing.T) {
 	requireFswatch(t)
 	tmpDir := t.TempDir()
 	restoreKubeconfig := setupTestKubeconfig(t, tmpDir)
@@ -200,7 +201,7 @@ safety:
 	// Wait to ensure we can detect time differences
 	time.Sleep(100 * time.Millisecond)
 
-	// Modify the kubeconfig but keep the same context
+	// Modify the kubeconfig but keep the same context (e.g., adding a new cluster)
 	kubeconfigPath := GetKubeconfigPath()
 	kubeconfigContent := `apiVersion: v1
 kind: Config
@@ -247,7 +248,7 @@ users:
 	// Give the file watcher time to process the event
 	time.Sleep(500 * time.Millisecond)
 
-	// Check that activity was NOT updated (context didn't change)
+	// Check that activity WAS updated (any kubeconfig modification extends timeout)
 	newActivity, newContext, err := daemon.stateManager.GetLastActivity()
 	if err != nil {
 		t.Fatalf("Failed to get new activity: %v", err)
@@ -258,13 +259,13 @@ users:
 		t.Errorf("Context should not have changed, got '%s', want '%s'", newContext, initialContext)
 	}
 
-	// Verify activity timestamp was NOT updated (should be the same)
-	if newActivity != initialActivity {
-		t.Errorf("Activity timestamp should not have changed when context stayed the same")
-		t.Logf("Initial: %v, New: %v (difference: %v)", initialActivity, newActivity, newActivity.Sub(initialActivity))
+	// Verify activity timestamp WAS updated (kubeconfig modification should extend timeout)
+	if !newActivity.After(initialActivity) {
+		t.Errorf("Activity timestamp should have been updated when kubeconfig was modified")
+		t.Logf("Initial: %v, New: %v", initialActivity, newActivity)
 	}
 
-	t.Logf("File watcher correctly ignored file change with same context '%s'", newContext)
+	t.Logf("File watcher correctly extended timeout on kubeconfig modification in context '%s'", newContext)
 
 	daemon.Shutdown()
 	select {
