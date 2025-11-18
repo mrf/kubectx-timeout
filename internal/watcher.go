@@ -22,15 +22,11 @@ type KubeconfigWatcher struct {
 
 // NewKubeconfigWatcher creates a new kubeconfig watcher
 func NewKubeconfigWatcher(stateManager *StateManager, logger *log.Logger, ctx context.Context) (*KubeconfigWatcher, error) {
-	// Get kubeconfig path - check KUBECONFIG env var first, then default to ~/.kube/config
-	kubeconfigPath := os.Getenv("KUBECONFIG")
-	if kubeconfigPath == "" {
-		home, err := os.UserHomeDir()
-		if err != nil {
-			return nil, fmt.Errorf("failed to get home directory: %w", err)
-		}
-		kubeconfigPath = filepath.Join(home, ".kube", "config")
-	}
+	// Get kubeconfig path using the centralized function
+	kubeconfigPath := GetKubeconfigPath()
+
+	// Clean the path to resolve any .. or other path issues (security hardening)
+	kubeconfigPath = filepath.Clean(kubeconfigPath)
 
 	return &KubeconfigWatcher{
 		kubeconfigPath: kubeconfigPath,
@@ -96,6 +92,9 @@ func (w *KubeconfigWatcher) watchWithFswatch() error {
 		}
 
 		// Start fswatch process
+		// #nosec G204 -- kubeconfigPath is cleaned with filepath.Clean in NewKubeconfigWatcher
+		// and only used as a file path argument (not executed). CommandContext prevents shell
+		// injection by not using shell interpretation.
 		cmd := exec.CommandContext(w.ctx, "fswatch",
 			"-0",              // NUL separator
 			"-1",              // Exit after first set of events
