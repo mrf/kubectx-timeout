@@ -31,6 +31,18 @@ func main() {
 		cmdInit()
 	case "daemon":
 		cmdDaemon()
+	case "daemon-install":
+		cmdDaemonInstall()
+	case "daemon-uninstall":
+		cmdDaemonUninstall()
+	case "daemon-start":
+		cmdDaemonStart()
+	case "daemon-stop":
+		cmdDaemonStop()
+	case "daemon-restart":
+		cmdDaemonRestart()
+	case "daemon-status":
+		cmdDaemonStatus()
 	case "install-shell":
 		cmdInstallShell()
 	case "uninstall-shell":
@@ -56,6 +68,12 @@ Commands:
   version              Show version information
   init                 Initialize configuration file
   daemon               Run the timeout monitoring daemon
+  daemon-install       Install daemon as launchd service (macOS)
+  daemon-uninstall     Remove daemon launchd service
+  daemon-start         Start the daemon
+  daemon-stop          Stop the daemon
+  daemon-restart       Restart the daemon
+  daemon-status        Show daemon status
   install-shell        Install shell integration (kubectl wrapper)
   uninstall-shell      Remove shell integration
   record-activity      Record kubectl activity (used by shell integration)
@@ -72,7 +90,16 @@ Examples:
   kubectx-timeout install-shell bash
   kubectx-timeout install-shell zsh
 
-  # Run daemon (usually via launchd, but can run manually)
+  # Install daemon to run automatically
+  kubectx-timeout daemon-install
+
+  # Control daemon
+  kubectx-timeout daemon-start
+  kubectx-timeout daemon-stop
+  kubectx-timeout daemon-restart
+  kubectx-timeout daemon-status
+
+  # Run daemon manually (for testing)
   kubectx-timeout daemon
 
 For more information, visit: https://github.com/mrf/kubectx-timeout
@@ -471,4 +498,159 @@ func isValidShellArg(shell string) bool {
 	default:
 		return false
 	}
+}
+
+func cmdDaemonInstall() {
+	// Get binary path
+	binaryPath, err := os.Executable()
+	if err != nil {
+		log.Fatalf("Failed to determine executable path: %v", err)
+	}
+	// Resolve symlinks
+	binaryPath, err = filepath.EvalSymlinks(binaryPath)
+	if err != nil {
+		log.Fatalf("Failed to resolve executable path: %v", err)
+	}
+
+	fs := flag.NewFlagSet("daemon-install", flag.ExitOnError)
+	customBinaryPath := fs.String("binary", binaryPath, "Path to kubectx-timeout binary")
+	if err := fs.Parse(os.Args[2:]); err != nil {
+		log.Fatalf("Failed to parse flags: %v", err)
+	}
+
+	// Create launchd manager
+	lm, err := internal.NewLaunchdManager(*customBinaryPath)
+	if err != nil {
+		log.Fatalf("Failed to create launchd manager: %v", err)
+	}
+
+	// Install daemon
+	fmt.Println("Installing kubectx-timeout daemon...")
+	fmt.Printf("  Binary: %s\n", *customBinaryPath)
+	fmt.Printf("  Plist: %s\n", lm.GetPlistPath())
+
+	if err := lm.Install(); err != nil {
+		log.Fatalf("Failed to install daemon: %v", err)
+	}
+
+	fmt.Println("\n✓ Daemon installed and started successfully")
+	fmt.Println("\nThe daemon will now:")
+	fmt.Println("  • Start automatically on login")
+	fmt.Println("  • Monitor kubectl activity in the background")
+	fmt.Println("  • Switch to your default context after the timeout period")
+	fmt.Println("\nUseful commands:")
+	fmt.Println("  kubectx-timeout daemon-status   - Check daemon status")
+	fmt.Println("  kubectx-timeout daemon-stop     - Stop the daemon")
+	fmt.Println("  kubectx-timeout daemon-restart  - Restart the daemon")
+	fmt.Printf("  tail -f %s  - View daemon logs\n", filepath.Join(internal.GetStateDir(), "daemon.stdout.log"))
+}
+
+func cmdDaemonUninstall() {
+	fs := flag.NewFlagSet("daemon-uninstall", flag.ExitOnError)
+	noConfirm := fs.Bool("yes", false, "Skip confirmation prompt")
+	if err := fs.Parse(os.Args[2:]); err != nil {
+		log.Fatalf("Failed to parse flags: %v", err)
+	}
+
+	// Create launchd manager
+	lm, err := internal.NewLaunchdManager("")
+	if err != nil {
+		log.Fatalf("Failed to create launchd manager: %v", err)
+	}
+
+	// Check if installed
+	if !lm.IsInstalled() {
+		fmt.Println("Daemon is not installed (nothing to remove)")
+		return
+	}
+
+	// Confirm unless --yes flag is set
+	if !*noConfirm {
+		fmt.Print("Are you sure you want to uninstall the daemon? [y/N]: ")
+		reader := bufio.NewReader(os.Stdin)
+		response, err := reader.ReadString('\n')
+		if err != nil {
+			log.Fatalf("Failed to read input: %v", err)
+		}
+		response = strings.TrimSpace(strings.ToLower(response))
+		if response != "y" && response != "yes" {
+			fmt.Println("Uninstallation cancelled")
+			return
+		}
+	}
+
+	// Uninstall daemon
+	fmt.Println("Uninstalling daemon...")
+	if err := lm.Uninstall(); err != nil {
+		log.Fatalf("Failed to uninstall daemon: %v", err)
+	}
+
+	fmt.Println("✓ Daemon uninstalled successfully")
+	fmt.Printf("  Removed: %s\n", lm.GetPlistPath())
+}
+
+func cmdDaemonStart() {
+	// Create launchd manager
+	lm, err := internal.NewLaunchdManager("")
+	if err != nil {
+		log.Fatalf("Failed to create launchd manager: %v", err)
+	}
+
+	fmt.Println("Starting daemon...")
+	if err := lm.Start(); err != nil {
+		log.Fatalf("Failed to start daemon: %v", err)
+	}
+
+	fmt.Println("✓ Daemon started successfully")
+}
+
+func cmdDaemonStop() {
+	// Create launchd manager
+	lm, err := internal.NewLaunchdManager("")
+	if err != nil {
+		log.Fatalf("Failed to create launchd manager: %v", err)
+	}
+
+	fmt.Println("Stopping daemon...")
+	if err := lm.Stop(); err != nil {
+		log.Fatalf("Failed to stop daemon: %v", err)
+	}
+
+	fmt.Println("✓ Daemon stopped successfully")
+}
+
+func cmdDaemonRestart() {
+	// Create launchd manager
+	lm, err := internal.NewLaunchdManager("")
+	if err != nil {
+		log.Fatalf("Failed to create launchd manager: %v", err)
+	}
+
+	fmt.Println("Restarting daemon...")
+	if err := lm.Restart(); err != nil {
+		log.Fatalf("Failed to restart daemon: %v", err)
+	}
+
+	fmt.Println("✓ Daemon restarted successfully")
+}
+
+func cmdDaemonStatus() {
+	// Create launchd manager
+	lm, err := internal.NewLaunchdManager("")
+	if err != nil {
+		log.Fatalf("Failed to create launchd manager: %v", err)
+	}
+
+	status, err := lm.GetStatus()
+	if err != nil {
+		log.Fatalf("Failed to get daemon status: %v", err)
+	}
+
+	fmt.Println(status)
+
+	// Show log file locations
+	stateDir := internal.GetStateDir()
+	fmt.Printf("\nLog Files:\n")
+	fmt.Printf("  stdout: %s\n", filepath.Join(stateDir, "daemon.stdout.log"))
+	fmt.Printf("  stderr: %s\n", filepath.Join(stateDir, "daemon.stderr.log"))
 }

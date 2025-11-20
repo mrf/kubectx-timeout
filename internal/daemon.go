@@ -18,6 +18,7 @@ type Daemon struct {
 	ctx          context.Context
 	cancel       context.CancelFunc
 	logger       *log.Logger
+	pidFile      *PIDFile
 }
 
 // NewDaemon creates a new daemon instance
@@ -43,6 +44,9 @@ func NewDaemon(configPath string, statePath string) (*Daemon, error) {
 	// Create context switcher
 	switcher := NewContextSwitcher(logger)
 
+	// Create PID file manager
+	pidFile := NewPIDFile()
+
 	daemon := &Daemon{
 		config:       config,
 		stateManager: sm,
@@ -50,6 +54,7 @@ func NewDaemon(configPath string, statePath string) (*Daemon, error) {
 		ctx:          ctx,
 		cancel:       cancel,
 		logger:       logger,
+		pidFile:      pidFile,
 	}
 
 	// Check if context changed while daemon was down
@@ -124,7 +129,15 @@ func (d *Daemon) Run() error {
 		return nil
 	}
 
-	d.logger.Printf("Starting kubectx-timeout daemon (check interval: %v, default timeout: %v)",
+	// Acquire PID file to ensure single instance
+	if err := d.pidFile.Acquire(); err != nil {
+		return fmt.Errorf("failed to acquire PID file: %w", err)
+	}
+	// Ensure PID file is released on exit
+	defer d.pidFile.Release()
+
+	d.logger.Printf("Starting kubectx-timeout daemon (PID: %d, check interval: %v, default timeout: %v)",
+		os.Getpid(),
 		d.config.Timeout.CheckInterval,
 		d.config.Timeout.Default)
 
@@ -259,6 +272,15 @@ func (d *Daemon) ReloadConfig() error {
 
 // Shutdown gracefully shuts down the daemon
 func (d *Daemon) Shutdown() {
-	d.logger.Println("Shutting down daemon...")
+	d.logger.Println("Shutting down daemon gracefully...")
+
+	// Cancel context to signal shutdown
 	d.cancel()
+
+	// Release PID file
+	if err := d.pidFile.Release(); err != nil {
+		d.logger.Printf("Warning: failed to release PID file: %v", err)
+	}
+
+	d.logger.Println("Daemon shutdown complete")
 }
