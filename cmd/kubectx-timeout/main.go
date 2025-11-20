@@ -31,6 +31,18 @@ func main() {
 		cmdInit()
 	case "daemon":
 		cmdDaemon()
+	case "daemon-install":
+		cmdDaemonInstall()
+	case "daemon-uninstall":
+		cmdDaemonUninstall()
+	case "daemon-start":
+		cmdDaemonStart()
+	case "daemon-stop":
+		cmdDaemonStop()
+	case "daemon-restart":
+		cmdDaemonRestart()
+	case "daemon-status":
+		cmdDaemonStatus()
 	case "install-shell":
 		cmdInstallShell()
 	case "uninstall-shell":
@@ -56,6 +68,12 @@ Commands:
   version              Show version information
   init                 Initialize configuration file
   daemon               Run the timeout monitoring daemon
+  daemon-install       Install daemon as launchd service (macOS)
+  daemon-uninstall     Remove daemon launchd service
+  daemon-start         Start the daemon
+  daemon-stop          Stop the daemon
+  daemon-restart       Restart the daemon
+  daemon-status        Show daemon status
   install-shell        Install shell integration (kubectl wrapper)
   uninstall-shell      Remove shell integration
   record-activity      Record kubectl activity (used by shell integration)
@@ -72,7 +90,16 @@ Examples:
   kubectx-timeout install-shell bash
   kubectx-timeout install-shell zsh
 
-  # Run daemon (usually via launchd, but can run manually)
+  # Install daemon to run automatically
+  kubectx-timeout daemon-install
+
+  # Control daemon
+  kubectx-timeout daemon-start
+  kubectx-timeout daemon-stop
+  kubectx-timeout daemon-restart
+  kubectx-timeout daemon-status
+
+  # Run daemon manually (for testing)
   kubectx-timeout daemon
 
 For more information, visit: https://github.com/mrf/kubectx-timeout

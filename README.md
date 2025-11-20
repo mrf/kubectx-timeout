@@ -95,9 +95,31 @@ This modifies your shell profile (`.bashrc`, `.zshrc`, or `config.fish`) to wrap
 
 #### 4. Set Up Daemon (macOS)
 
-The daemon can be run manually or set up with launchd for automatic startup. See the [launchd Integration](#launchd-integration-recommended) section below for automatic startup configuration.
+The daemon runs automatically via launchd. Install and start it with:
 
-**Manual daemon control:**
+```bash
+# Install daemon as launchd service
+kubectx-timeout daemon-install
+
+# The daemon will start automatically and on login
+# Check status
+kubectx-timeout daemon-status
+```
+
+**Daemon Management Commands:**
+
+```bash
+kubectx-timeout daemon-install   # Install daemon as launchd service (macOS)
+kubectx-timeout daemon-start     # Start the daemon
+kubectx-timeout daemon-stop      # Stop the daemon
+kubectx-timeout daemon-restart   # Restart the daemon
+kubectx-timeout daemon-status    # Show daemon status
+kubectx-timeout daemon-uninstall # Remove daemon service
+```
+
+For detailed daemon documentation, see [DAEMON.md](DAEMON.md).
+
+**Manual daemon control (for testing):**
 ```bash
 # Run in foreground (for testing)
 kubectx-timeout daemon
@@ -117,23 +139,26 @@ kubectx-timeout version
 # Run a kubectl command (activity will be tracked)
 kubectl get pods
 
-# Check if daemon is running
-ps aux | grep kubectx-timeout
+# Check daemon status
+kubectx-timeout daemon-status
 
 # View logs
-tail -f ~/.local/state/kubectx-timeout/daemon.log
+tail -f ~/.local/state/kubectx-timeout/daemon.stdout.log
+tail -f ~/.local/state/kubectx-timeout/daemon.stderr.log
 ```
 
 ### Uninstallation
 
-To uninstall manually:
+To uninstall:
 
 ```bash
-# 1. Stop the daemon (if using launchd)
-launchctl unload ~/Library/LaunchAgents/com.kubectx-timeout.plist
-rm ~/Library/LaunchAgents/com.kubectx-timeout.plist
+# 1. Uninstall the daemon
+kubectx-timeout daemon-uninstall
 
-# 2. Remove shell integration from your shell profile
+# 2. Remove shell integration
+kubectx-timeout uninstall-shell
+
+# Or manually edit your shell profile
 # Edit ~/.bashrc, ~/.zshrc, or ~/.config/fish/config.fish
 # and remove the kubectx-timeout function/wrapper
 
@@ -256,41 +281,48 @@ kubectx-timeout --help
 kubectx-timeout --config /custom/path/config.yaml --state /custom/path/state.json daemon
 ```
 
-### launchd Integration (Recommended)
+### Daemon Management
 
-For automatic startup on macOS, use launchd:
+The daemon is managed through launchd on macOS for automatic startup and process supervision.
+
+**Quick Start:**
 
 ```bash
-# 1. Copy the example plist
-cp examples/com.kubectx-timeout.plist ~/Library/LaunchAgents/
+# Install daemon as launchd service
+kubectx-timeout daemon-install
 
-# 2. Edit the plist to replace YOUR_USERNAME with your actual username
-nano ~/Library/LaunchAgents/com.kubectx-timeout.plist
-
-# 3. Load the daemon
-launchctl load ~/Library/LaunchAgents/com.kubectx-timeout.plist
-
-# 4. Check it's running
-launchctl list | grep kubectx-timeout
+# The daemon will start automatically and on every login
+kubectx-timeout daemon-status
 ```
 
-The daemon will now start automatically on login.
-
-### Manual Daemon Management
+**Management Commands:**
 
 ```bash
-# Start daemon (foreground)
+kubectx-timeout daemon-install   # Install daemon as launchd service
+kubectx-timeout daemon-uninstall # Remove daemon service
+kubectx-timeout daemon-start     # Start the daemon
+kubectx-timeout daemon-stop      # Stop the daemon
+kubectx-timeout daemon-restart   # Restart the daemon
+kubectx-timeout daemon-status    # Show detailed status
+```
+
+**Manual Mode (for testing/development):**
+
+```bash
+# Start daemon in foreground
 kubectx-timeout daemon
 
-# Start daemon (background)
+# Start daemon in background
 kubectx-timeout daemon &
 
 # Reload configuration (send SIGHUP)
-killall -HUP kubectx-timeout
+pkill -HUP kubectx-timeout
 
 # Stop daemon
-killall kubectx-timeout
+pkill kubectx-timeout
 ```
+
+For detailed documentation on daemon management, architecture, troubleshooting, and advanced usage, see [DAEMON.md](DAEMON.md).
 
 ## How It Works in Detail
 
@@ -331,12 +363,11 @@ brew install fswatch
 After installation, restart the daemon to enable file monitoring:
 
 ```bash
-# If using launchd
-launchctl unload ~/Library/LaunchAgents/com.kubectx-timeout.plist
-launchctl load ~/Library/LaunchAgents/com.kubectx-timeout.plist
+# If using launchd (recommended)
+kubectx-timeout daemon-restart
 
 # Or if running manually, stop and restart the process
-killall kubectx-timeout
+pkill kubectx-timeout
 kubectx-timeout daemon &
 ```
 
@@ -431,18 +462,15 @@ kubectx-timeout/
 ### Daemon Not Starting
 
 ```bash
-# Check if daemon is running
-ps aux | grep kubectx-timeout
-
-# Check launchd status
-launchctl list | grep kubectx-timeout
+# Check daemon status
+kubectx-timeout daemon-status
 
 # View logs
-tail -f ~/.local/state/kubectx-timeout/daemon.log
-
-# View launchd stderr/stdout
 tail -f ~/.local/state/kubectx-timeout/daemon.stderr.log
 tail -f ~/.local/state/kubectx-timeout/daemon.stdout.log
+
+# Try restarting
+kubectx-timeout daemon-restart
 ```
 
 ### Activity Not Being Tracked
@@ -468,7 +496,7 @@ cat ~/.config/kubectx-timeout/config.yaml
 kubectl config get-contexts
 
 # Check daemon logs for errors
-tail -100 ~/.local/state/kubectx-timeout/daemon.log
+tail -100 ~/.local/state/kubectx-timeout/daemon.stderr.log
 ```
 
 ### File System Monitoring Not Working
@@ -482,11 +510,10 @@ fswatch --version
 brew install fswatch
 
 # Check daemon logs for fswatch status
-tail -100 ~/.local/state/kubectx-timeout/daemon.log | grep -i fswatch
+tail -100 ~/.local/state/kubectx-timeout/daemon.stdout.log | grep -i fswatch
 
-# Restart daemon after installing fswatch (if using launchd)
-launchctl unload ~/Library/LaunchAgents/com.kubectx-timeout.plist
-launchctl load ~/Library/LaunchAgents/com.kubectx-timeout.plist
+# Restart daemon after installing fswatch
+kubectx-timeout daemon-restart
 
 # Verify KUBECONFIG path
 echo $KUBECONFIG  # Should show path to config, or be empty (uses ~/.kube/config)
