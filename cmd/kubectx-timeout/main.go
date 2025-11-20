@@ -499,4 +499,3 @@ func isValidShellArg(shell string) bool {
 		return false
 	}
 }
-
