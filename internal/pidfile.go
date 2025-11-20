@@ -26,7 +26,7 @@ func NewPIDFile() *PIDFile {
 func (p *PIDFile) Acquire() error {
 	// Ensure state directory exists
 	stateDir := filepath.Dir(p.path)
-	if err := os.MkdirAll(stateDir, 0755); err != nil {
+	if err := os.MkdirAll(stateDir, 0750); err != nil {
 		return fmt.Errorf("failed to create state directory: %w", err)
 	}
 
@@ -38,13 +38,13 @@ func (p *PIDFile) Acquire() error {
 			return fmt.Errorf("daemon is already running with PID %d", existingPID)
 		}
 		// Stale PID file, remove it
-		os.Remove(p.path)
+		_ = os.Remove(p.path) // Ignore error on cleanup
 	}
 
 	// Write current PID to file
 	pid := os.Getpid()
 	pidStr := strconv.Itoa(pid)
-	if err := os.WriteFile(p.path, []byte(pidStr+"\n"), 0644); err != nil {
+	if err := os.WriteFile(p.path, []byte(pidStr+"\n"), 0600); err != nil {
 		return fmt.Errorf("failed to write PID file: %w", err)
 	}
 

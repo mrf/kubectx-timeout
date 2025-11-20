@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"strings"
 )
@@ -126,13 +127,13 @@ func (lm *LaunchdManager) Install() error {
 
 	// Ensure LaunchAgents directory exists
 	launchAgentsDir := filepath.Dir(lm.plistPath)
-	if err := os.MkdirAll(launchAgentsDir, 0755); err != nil {
+	if err := os.MkdirAll(launchAgentsDir, 0750); err != nil {
 		return fmt.Errorf("failed to create LaunchAgents directory: %w", err)
 	}
 
 	// Ensure state directory exists
 	stateDir := GetStateDir()
-	if err := os.MkdirAll(stateDir, 0755); err != nil {
+	if err := os.MkdirAll(stateDir, 0750); err != nil {
 		return fmt.Errorf("failed to create state directory: %w", err)
 	}
 
@@ -143,14 +144,14 @@ func (lm *LaunchdManager) Install() error {
 	}
 
 	// Write plist file
-	if err := os.WriteFile(lm.plistPath, []byte(plistContent), 0644); err != nil {
+	if err := os.WriteFile(lm.plistPath, []byte(plistContent), 0600); err != nil {
 		return fmt.Errorf("failed to write plist file: %w", err)
 	}
 
 	// Load the daemon
 	if err := lm.Load(); err != nil {
 		// If load fails, clean up the plist file
-		os.Remove(lm.plistPath)
+		_ = os.Remove(lm.plistPath) // Ignore error on cleanup
 		return fmt.Errorf("failed to load daemon: %w", err)
 	}
 
@@ -228,6 +229,11 @@ func (lm *LaunchdManager) Restart() error {
 
 // Load loads the daemon using launchctl
 func (lm *LaunchdManager) Load() error {
+	// Validate plist path to prevent command injection
+	if err := validatePath(lm.plistPath); err != nil {
+		return fmt.Errorf("invalid plist path: %w", err)
+	}
+	// #nosec G204 - plistPath is validated and constructed from trusted sources
 	cmd := exec.Command("launchctl", "load", lm.plistPath)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
@@ -238,6 +244,11 @@ func (lm *LaunchdManager) Load() error {
 
 // Unload unloads the daemon using launchctl
 func (lm *LaunchdManager) Unload() error {
+	// Validate plist path to prevent command injection
+	if err := validatePath(lm.plistPath); err != nil {
+		return fmt.Errorf("invalid plist path: %w", err)
+	}
+	// #nosec G204 - plistPath is validated and constructed from trusted sources
 	cmd := exec.Command("launchctl", "unload", lm.plistPath)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
@@ -254,6 +265,7 @@ func (lm *LaunchdManager) IsInstalled() bool {
 
 // IsRunning checks if the daemon is currently running
 func (lm *LaunchdManager) IsRunning() bool {
+	// #nosec G204 - label is a constant (LaunchdLabel)
 	cmd := exec.Command("launchctl", "list", lm.label)
 	err := cmd.Run()
 	return err == nil
@@ -273,6 +285,7 @@ func (lm *LaunchdManager) GetStatus() (string, error) {
 
 	if installed && running {
 		// Get detailed status from launchctl
+		// #nosec G204 - label is a constant (LaunchdLabel)
 		cmd := exec.Command("launchctl", "list", lm.label)
 		output, err := cmd.CombinedOutput()
 		if err == nil {
@@ -289,6 +302,7 @@ func (lm *LaunchdManager) GetPID() (int, error) {
 		return 0, nil
 	}
 
+	// #nosec G204 - label is a constant (LaunchdLabel)
 	cmd := exec.Command("launchctl", "list", lm.label)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
@@ -302,7 +316,7 @@ func (lm *LaunchdManager) GetPID() (int, error) {
 			fields := strings.Fields(line)
 			if len(fields) >= 3 {
 				var pid int
-				fmt.Sscanf(fields[2], "%d", &pid)
+				_, _ = fmt.Sscanf(fields[2], "%d", &pid) // Ignore scan errors
 				return pid, nil
 			}
 		}
@@ -343,4 +357,18 @@ func (lm *LaunchdManager) generatePlist() (string, error) {
 // GetPlistPath returns the path to the plist file
 func (lm *LaunchdManager) GetPlistPath() string {
 	return lm.plistPath
+}
+
+// validatePath ensures path doesn't contain shell metacharacters that could enable command injection
+func validatePath(path string) error {
+	// Check for shell metacharacters and command separators
+	dangerousChars := regexp.MustCompile(`[;&|$\x60<>(){}[\]!]`)
+	if dangerousChars.MatchString(path) {
+		return fmt.Errorf("path contains dangerous characters")
+	}
+	// Ensure path is absolute to prevent relative path tricks
+	if !filepath.IsAbs(path) {
+		return fmt.Errorf("path must be absolute")
+	}
+	return nil
 }
