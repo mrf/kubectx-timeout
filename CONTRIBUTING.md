@@ -28,8 +28,10 @@ We are committed to providing a welcoming and inclusive environment for all cont
 
 - Go 1.21 or later
 - macOS (this project targets macOS specifically)
-- kubectl installed and configured
+- **kubectl** installed and configured (required for running tests)
 - Git
+
+**Note**: kubectl must be available in your `$PATH` for the test suite to run successfully. Many tests create isolated kubeconfig files and use kubectl commands to verify functionality.
 
 ### Fork and Clone
 
@@ -178,7 +180,12 @@ For detailed Go best practices and examples, see [DEVELOPMENT.md](DEVELOPMENT.md
 
 ### Running Tests
 
+**Prerequisites**: Ensure kubectl is installed and available in your `$PATH` before running tests.
+
 ```bash
+# Verify kubectl is available
+which kubectl
+
 # Run all tests with race detector
 make test
 
@@ -187,6 +194,14 @@ make coverage
 
 # Run integration tests
 go test -tags=integration ./...
+```
+
+**Troubleshooting**: If tests fail with "kubectl: executable file not found", install kubectl:
+```bash
+# macOS with Homebrew
+brew install kubectl
+
+# Or download from kubernetes.io
 ```
 
 ### Test Structure

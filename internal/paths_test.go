@@ -188,3 +188,58 @@ func TestGetStatePath(t *testing.T) {
 		})
 	}
 }
+
+func TestGetKubeconfigPath(t *testing.T) {
+	tests := []struct {
+		name         string
+		kubeconfig   string
+		home         string
+		expectedPath string
+	}{
+		{
+			name:         "KUBECONFIG env set to single path",
+			kubeconfig:   "/custom/path/kubeconfig.yaml",
+			home:         "/home/user",
+			expectedPath: "/custom/path/kubeconfig.yaml",
+		},
+		{
+			name:         "KUBECONFIG env with multiple paths (colon-separated)",
+			kubeconfig:   "/first/path/config:/second/path/config:/third/path/config",
+			home:         "/home/user",
+			expectedPath: "/first/path/config",
+		},
+		{
+			name:         "KUBECONFIG not set, use default",
+			kubeconfig:   "",
+			home:         "/home/user",
+			expectedPath: "/home/user/.kube/config",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			oldKubeconfig := os.Getenv("KUBECONFIG")
+			oldHome := os.Getenv("HOME")
+			defer func() {
+				if oldKubeconfig != "" {
+					os.Setenv("KUBECONFIG", oldKubeconfig)
+				} else {
+					os.Unsetenv("KUBECONFIG")
+				}
+				os.Setenv("HOME", oldHome)
+			}()
+
+			os.Setenv("HOME", tt.home)
+			if tt.kubeconfig != "" {
+				os.Setenv("KUBECONFIG", tt.kubeconfig)
+			} else {
+				os.Unsetenv("KUBECONFIG")
+			}
+
+			result := GetKubeconfigPath()
+			if result != tt.expectedPath {
+				t.Errorf("GetKubeconfigPath() = %v, want %v", result, tt.expectedPath)
+			}
+		})
+	}
+}
