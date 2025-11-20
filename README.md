@@ -43,11 +43,12 @@ kubectx-timeout init
 # 4. Install shell integration (auto-detects your shell: bash/zsh/fish)
 kubectx-timeout install-shell
 
-# 5. (Optional but recommended) Install fswatch for automatic context switch detection
-brew install fswatch
+# 5. Install and start the daemon (macOS launchd)
+kubectx-timeout daemon-install
+kubectx-timeout daemon-start
 
-# 6. Start the daemon (see launchd setup below for automatic startup)
-kubectx-timeout daemon &
+# 6. (Optional but recommended) Install fswatch for automatic context switch detection
+brew install fswatch
 
 # 7. Restart your shell
 source ~/.bashrc  # or ~/.zshrc
@@ -65,6 +66,7 @@ sudo cp bin/kubectx-timeout /usr/local/bin/
 ```
 
 #### 2. Initialize Configuration
+
 
 The `init` command creates an interactive configuration file:
 
@@ -95,31 +97,25 @@ This modifies your shell profile (`.bashrc`, `.zshrc`, or `config.fish`) to wrap
 
 #### 4. Set Up Daemon (macOS)
 
-The daemon runs automatically via launchd. Install and start it with:
+Install the launchd agent for automatic daemon startup:
 
 ```bash
-# Install daemon as launchd service
+# Install daemon configuration
 kubectx-timeout daemon-install
 
-# The daemon will start automatically and on login
-# Check status
+# Start the daemon
+kubectx-timeout daemon-start
+
+# Check daemon status
 kubectx-timeout daemon-status
 ```
 
-**Daemon Management Commands:**
+**Other daemon commands:**
+- `kubectx-timeout daemon-stop` - Stop the daemon
+- `kubectx-timeout daemon-restart` - Restart the daemon
+- `kubectx-timeout daemon-uninstall` - Remove daemon configuration
 
-```bash
-kubectx-timeout daemon-install   # Install daemon as launchd service (macOS)
-kubectx-timeout daemon-start     # Start the daemon
-kubectx-timeout daemon-stop      # Stop the daemon
-kubectx-timeout daemon-restart   # Restart the daemon
-kubectx-timeout daemon-status    # Show daemon status
-kubectx-timeout daemon-uninstall # Remove daemon service
-```
-
-For detailed daemon documentation, see [DAEMON.md](DAEMON.md).
-
-**Manual daemon control (for testing):**
+**Manual daemon control** (if not using launchd):
 ```bash
 # Run in foreground (for testing)
 kubectx-timeout daemon
@@ -143,32 +139,34 @@ kubectl get pods
 kubectx-timeout daemon-status
 
 # View logs
-tail -f ~/.local/state/kubectx-timeout/daemon.stdout.log
-tail -f ~/.local/state/kubectx-timeout/daemon.stderr.log
+tail -f ~/.local/state/kubectx-timeout/daemon.log
 ```
 
 ### Uninstallation
 
-To uninstall:
+To uninstall kubectx-timeout, follow these steps:
 
 ```bash
-# 1. Uninstall the daemon
+# 1. Stop and remove the daemon
+kubectx-timeout daemon-stop
 kubectx-timeout daemon-uninstall
 
 # 2. Remove shell integration
 kubectx-timeout uninstall-shell
 
-# Or manually edit your shell profile
-# Edit ~/.bashrc, ~/.zshrc, or ~/.config/fish/config.fish
-# and remove the kubectx-timeout function/wrapper
-
-# 3. Remove configuration and state files
+# 3. Remove configuration and state files (optional)
 rm -rf ~/.config/kubectx-timeout
 rm -rf ~/.local/state/kubectx-timeout
 
-# 4. Remove the binary
+# 4. Remove the binary (optional)
 sudo rm /usr/local/bin/kubectx-timeout
 ```
+
+**What gets removed:**
+- `daemon-uninstall` - Removes launchd plist from `~/Library/LaunchAgents/`
+- `uninstall-shell` - Removes shell wrapper from `.bashrc`, `.zshrc`, or `config.fish`
+- Manual cleanup removes config and state directories
+- Manual removal of the binary from `/usr/local/bin/`
 
 ## Configuration
 
@@ -363,12 +361,7 @@ brew install fswatch
 After installation, restart the daemon to enable file monitoring:
 
 ```bash
-# If using launchd (recommended)
 kubectx-timeout daemon-restart
-
-# Or if running manually, stop and restart the process
-pkill kubectx-timeout
-kubectx-timeout daemon &
 ```
 
 #### Behavior
@@ -510,7 +503,7 @@ fswatch --version
 brew install fswatch
 
 # Check daemon logs for fswatch status
-tail -100 ~/.local/state/kubectx-timeout/daemon.stdout.log | grep -i fswatch
+tail -100 ~/.local/state/kubectx-timeout/daemon.log | grep -i fswatch
 
 # Restart daemon after installing fswatch
 kubectx-timeout daemon-restart
