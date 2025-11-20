@@ -265,7 +265,7 @@ func (lm *LaunchdManager) GetStatus() (string, error) {
 	running := lm.IsRunning()
 
 	var status strings.Builder
-	status.WriteString(fmt.Sprintf("Daemon Status:\n"))
+	status.WriteString("Daemon Status:\n")
 	status.WriteString(fmt.Sprintf("  Installed: %v\n", installed))
 	status.WriteString(fmt.Sprintf("  Running: %v\n", running))
 	status.WriteString(fmt.Sprintf("  Plist Path: %s\n", lm.plistPath))
