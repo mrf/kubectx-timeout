@@ -44,8 +44,8 @@ kubectx-timeout init
 kubectx-timeout install-shell
 
 # 5. Install and start the daemon (macOS launchd)
-kubectx-timeout install-daemon
-kubectx-timeout start-daemon
+kubectx-timeout daemon-install
+kubectx-timeout daemon-start
 
 # 6. (Optional but recommended) Install fswatch for automatic context switch detection
 brew install fswatch
@@ -101,19 +101,19 @@ Install the launchd agent for automatic daemon startup:
 
 ```bash
 # Install daemon configuration
-kubectx-timeout install-daemon
+kubectx-timeout daemon-install
 
 # Start the daemon
-kubectx-timeout start-daemon
+kubectx-timeout daemon-start
 
 # Check daemon status
 kubectx-timeout daemon-status
 ```
 
 **Other daemon commands:**
-- `kubectx-timeout stop-daemon` - Stop the daemon
-- `kubectx-timeout restart-daemon` - Restart the daemon
-- `kubectx-timeout uninstall-daemon` - Remove daemon configuration
+- `kubectx-timeout daemon-stop` - Stop the daemon
+- `kubectx-timeout daemon-restart` - Restart the daemon
+- `kubectx-timeout daemon-uninstall` - Remove daemon configuration
 
 **Manual daemon control** (if not using launchd):
 ```bash
@@ -144,28 +144,29 @@ tail -f ~/.local/state/kubectx-timeout/daemon.log
 
 ### Uninstallation
 
-The CLI provides a complete uninstallation command:
+To uninstall kubectx-timeout, follow these steps:
 
 ```bash
-# Interactive uninstallation (keeps binary and config by default)
-kubectx-timeout uninstall
+# 1. Stop and remove the daemon
+kubectx-timeout daemon-stop
+kubectx-timeout daemon-uninstall
 
-# Complete removal including binary
-kubectx-timeout uninstall --all
+# 2. Remove shell integration
+kubectx-timeout uninstall-shell
 
-# Remove everything but keep configuration files
-kubectx-timeout uninstall --all --keep-config
+# 3. Remove configuration and state files (optional)
+rm -rf ~/.config/kubectx-timeout
+rm -rf ~/.local/state/kubectx-timeout
 
-# Non-interactive (useful for scripts)
-kubectx-timeout uninstall --all --yes
+# 4. Remove the binary (optional)
+sudo rm /usr/local/bin/kubectx-timeout
 ```
 
-The uninstall command will:
-1. Stop and remove the launchd daemon
-2. Remove shell integration from all detected shells
-3. Optionally remove configuration and state files
-4. Optionally remove the binary (with `--all`)
-5. Clean up backup files
+**What gets removed:**
+- `daemon-uninstall` - Removes launchd plist from `~/Library/LaunchAgents/`
+- `uninstall-shell` - Removes shell wrapper from `.bashrc`, `.zshrc`, or `config.fish`
+- Manual cleanup removes config and state directories
+- Manual removal of the binary from `/usr/local/bin/`
 
 ## Configuration
 
@@ -360,7 +361,7 @@ brew install fswatch
 After installation, restart the daemon to enable file monitoring:
 
 ```bash
-kubectx-timeout restart-daemon
+kubectx-timeout daemon-restart
 ```
 
 #### Behavior
@@ -505,7 +506,7 @@ brew install fswatch
 tail -100 ~/.local/state/kubectx-timeout/daemon.log | grep -i fswatch
 
 # Restart daemon after installing fswatch
-kubectx-timeout restart-daemon
+kubectx-timeout daemon-restart
 
 # Verify KUBECONFIG path
 echo $KUBECONFIG  # Should show path to config, or be empty (uses ~/.kube/config)
