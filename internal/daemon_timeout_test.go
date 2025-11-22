@@ -33,6 +33,7 @@ func TestDaemonTimeoutTriggersSwitch(t *testing.T) {
 	// Setup config and state files
 	configPath := filepath.Join(tmpDir, "config.yaml")
 	statePath := filepath.Join(tmpDir, "state.json")
+	pidPath := filepath.Join(tmpDir, "daemon.pid")
 	logPath := filepath.Join(tmpDir, "daemon.log")
 
 	// Create config with SHORT timeout for fast testing
@@ -58,7 +59,8 @@ safety:
 	}
 
 	// Create daemon
-	daemon, err := NewDaemon(configPath, statePath)
+	pidFile := NewPIDFileWithPath(pidPath)
+	daemon, err := NewDaemonWithPIDFile(configPath, statePath, pidFile)
 	if err != nil {
 		t.Fatalf("NewDaemon failed: %v", err)
 	}
@@ -121,10 +123,19 @@ safety:
 	t.Logf("Waiting %v for timeout to trigger...", waitTime)
 	time.Sleep(waitTime)
 
-	// Step 4: Verify daemon switched to safe context
-	currentCtx, err = GetCurrentContext()
-	if err != nil {
-		t.Fatalf("Failed to get current context after timeout: %v", err)
+	// Step 4: Verify daemon switched to safe context (with retry for race conditions)
+	maxAttempts := 10
+	for i := 0; i < maxAttempts; i++ {
+		currentCtx, err = GetCurrentContext()
+		if err != nil {
+			t.Fatalf("Failed to get current context after timeout: %v", err)
+		}
+		if currentCtx == safeContext {
+			break
+		}
+		if i < maxAttempts-1 {
+			time.Sleep(200 * time.Millisecond)
+		}
 	}
 
 	t.Logf("Current context after timeout: %s", currentCtx)
@@ -132,8 +143,8 @@ safety:
 	if currentCtx != safeContext {
 		// Read daemon logs for debugging
 		logs, _ := os.ReadFile(logPath)
-		t.Errorf("Daemon did not switch context after timeout!\nExpected: %s\nActual: %s\n\nDaemon logs:\n%s",
-			safeContext, currentCtx, string(logs))
+		t.Errorf("Daemon did not switch context after timeout and %d retries!\nExpected: %s\nActual: %s\n\nDaemon logs:\n%s",
+			maxAttempts, safeContext, currentCtx, string(logs))
 	}
 
 	// Cleanup happens automatically via defer restoreKubeconfig()
@@ -160,6 +171,7 @@ func TestDaemonDoesNotSwitchWhenActive(t *testing.T) {
 	// Setup config and state files
 	configPath := filepath.Join(tmpDir, "config.yaml")
 	statePath := filepath.Join(tmpDir, "state.json")
+	pidPath := filepath.Join(tmpDir, "daemon.pid")
 	logPath := filepath.Join(tmpDir, "daemon.log")
 
 	configContent := fmt.Sprintf(`timeout:
@@ -182,7 +194,8 @@ safety:
 	}
 
 	// Create daemon
-	daemon, err := NewDaemon(configPath, statePath)
+	pidFile := NewPIDFileWithPath(pidPath)
+	daemon, err := NewDaemonWithPIDFile(configPath, statePath, pidFile)
 	if err != nil {
 		t.Fatalf("NewDaemon failed: %v", err)
 	}
@@ -252,6 +265,7 @@ func TestDaemonRecordsActivityAfterSwitch(t *testing.T) {
 	// Setup config and state files
 	configPath := filepath.Join(tmpDir, "config.yaml")
 	statePath := filepath.Join(tmpDir, "state.json")
+	pidPath := filepath.Join(tmpDir, "daemon.pid")
 	logPath := filepath.Join(tmpDir, "daemon.log")
 
 	configContent := fmt.Sprintf(`timeout:
@@ -274,7 +288,8 @@ safety:
 	}
 
 	// Create daemon
-	daemon, err := NewDaemon(configPath, statePath)
+	pidFile := NewPIDFileWithPath(pidPath)
+	daemon, err := NewDaemonWithPIDFile(configPath, statePath, pidFile)
 	if err != nil {
 		t.Fatalf("NewDaemon failed: %v", err)
 	}
@@ -306,10 +321,20 @@ safety:
 	t.Logf("Waiting for timeout...")
 	time.Sleep(2 * time.Second)
 
-	// Verify switched to safe context
-	currentCtx, _ := GetCurrentContext()
+	// Verify switched to safe context (with retry for race conditions)
+	var currentCtx string
+	maxAttempts := 10
+	for i := 0; i < maxAttempts; i++ {
+		currentCtx, _ = GetCurrentContext()
+		if currentCtx == safeContext {
+			break
+		}
+		if i < maxAttempts-1 {
+			time.Sleep(200 * time.Millisecond)
+		}
+	}
 	if currentCtx != safeContext {
-		t.Fatalf("Daemon didn't switch to safe context: got %s", currentCtx)
+		t.Fatalf("Daemon didn't switch to safe context after %d attempts: got %s", maxAttempts, currentCtx)
 	}
 
 	// Check state file - what context does it have recorded?

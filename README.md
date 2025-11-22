@@ -115,13 +115,25 @@ kubectx-timeout daemon-status
 - `kubectx-timeout daemon-restart` - Restart the daemon
 - `kubectx-timeout daemon-uninstall` - Remove daemon configuration
 
-**Manual daemon control** (if not using launchd):
+**Direct daemon control** (alternative to launchd):
 ```bash
-# Run in foreground (for testing)
-kubectx-timeout daemon
+# Start daemon in background
+kubectx-timeout start
 
-# Run in background
-kubectx-timeout daemon &
+# Check daemon status and timeout info
+kubectx-timeout status
+
+# Stop the daemon
+kubectx-timeout stop
+
+# Reload configuration without restarting
+kubectx-timeout reload
+
+# Reset activity timer (prevent imminent timeout)
+kubectx-timeout reset
+
+# Run in foreground (for debugging)
+kubectx-timeout daemon
 ```
 
 ### Verification
@@ -304,20 +316,26 @@ kubectx-timeout daemon-restart   # Restart the daemon
 kubectx-timeout daemon-status    # Show detailed status
 ```
 
-**Manual Mode (for testing/development):**
+**Direct Control Commands (alternative to launchd):**
 
 ```bash
-# Start daemon in foreground
-kubectx-timeout daemon
-
 # Start daemon in background
-kubectx-timeout daemon &
+kubectx-timeout start
 
-# Reload configuration (send SIGHUP)
-pkill -HUP kubectx-timeout
+# Check daemon status and timeout information
+kubectx-timeout status
 
-# Stop daemon
-pkill kubectx-timeout
+# Stop the daemon
+kubectx-timeout stop
+
+# Reload configuration without restarting
+kubectx-timeout reload
+
+# Reset activity timer to prevent timeout
+kubectx-timeout reset
+
+# Run daemon in foreground (for debugging)
+kubectx-timeout daemon
 ```
 
 For detailed documentation on daemon management, architecture, troubleshooting, and advanced usage, see [DAEMON.md](DAEMON.md).

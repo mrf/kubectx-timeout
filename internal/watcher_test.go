@@ -119,6 +119,11 @@ func TestKubeconfigWatcher_IsFswatchAvailable(t *testing.T) {
 }
 
 func TestKubeconfigWatcher_HandleConfigChange(t *testing.T) {
+	// Check if kubectl is available
+	if _, err := GetCurrentContext(); err != nil {
+		t.Skipf("Skipping test: kubectl not available or not working: %v", err)
+	}
+
 	// Setup test kubeconfig
 	tmpDir := t.TempDir()
 	cleanup := setupTestKubeconfig(t, tmpDir)

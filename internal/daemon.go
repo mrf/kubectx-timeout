@@ -23,6 +23,12 @@ type Daemon struct {
 
 // NewDaemon creates a new daemon instance
 func NewDaemon(configPath string, statePath string) (*Daemon, error) {
+	return NewDaemonWithPIDFile(configPath, statePath, nil)
+}
+
+// NewDaemonWithPIDFile creates a new daemon instance with a custom PID file
+// If pidFile is nil, uses the default PID file location
+func NewDaemonWithPIDFile(configPath string, statePath string, pidFile *PIDFile) (*Daemon, error) {
 	// Load configuration
 	config, err := LoadConfig(configPath)
 	if err != nil {
@@ -44,8 +50,10 @@ func NewDaemon(configPath string, statePath string) (*Daemon, error) {
 	// Create context switcher
 	switcher := NewContextSwitcher(logger)
 
-	// Create PID file manager
-	pidFile := NewPIDFile()
+	// Create PID file manager if not provided
+	if pidFile == nil {
+		pidFile = NewPIDFile()
+	}
 
 	daemon := &Daemon{
 		config:       config,

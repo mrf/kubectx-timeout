@@ -14,11 +14,17 @@ type PIDFile struct {
 	path string
 }
 
-// NewPIDFile creates a new PID file manager
+// NewPIDFile creates a new PID file manager using the default state directory
 func NewPIDFile() *PIDFile {
 	stateDir := GetStateDir()
 	pidPath := filepath.Join(stateDir, "daemon.pid")
 	return &PIDFile{path: pidPath}
+}
+
+// NewPIDFileWithPath creates a new PID file manager with a custom path
+// Useful for testing to avoid conflicts with the system daemon
+func NewPIDFileWithPath(path string) *PIDFile {
+	return &PIDFile{path: path}
 }
 
 // Acquire creates the PID file and writes the current process ID

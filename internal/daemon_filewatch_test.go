@@ -35,6 +35,7 @@ func TestWatchKubeconfigDetectsChanges(t *testing.T) {
 
 	configPath := filepath.Join(tmpDir, "config.yaml")
 	statePath := filepath.Join(tmpDir, "state.json")
+	pidPath := filepath.Join(tmpDir, "daemon.pid")
 
 	// Create config
 	configContent := `
@@ -56,7 +57,8 @@ safety:
 	}
 
 	// Create daemon
-	daemon, err := NewDaemon(configPath, statePath)
+	pidFile := NewPIDFileWithPath(pidPath)
+	daemon, err := NewDaemonWithPIDFile(configPath, statePath, pidFile)
 	if err != nil {
 		t.Fatalf("NewDaemon failed: %v", err)
 	}
@@ -161,6 +163,7 @@ func TestWatchKubeconfigExtendsTimeoutOnModification(t *testing.T) {
 
 	configPath := filepath.Join(tmpDir, "config.yaml")
 	statePath := filepath.Join(tmpDir, "state.json")
+	pidPath := filepath.Join(tmpDir, "daemon.pid")
 
 	configContent := `
 timeout:
@@ -180,7 +183,8 @@ safety:
 		t.Fatalf("Failed to write config: %v", err)
 	}
 
-	daemon, err := NewDaemon(configPath, statePath)
+	pidFile := NewPIDFileWithPath(pidPath)
+	daemon, err := NewDaemonWithPIDFile(configPath, statePath, pidFile)
 	if err != nil {
 		t.Fatalf("NewDaemon failed: %v", err)
 	}
@@ -284,6 +288,7 @@ func TestWatchKubeconfigGracefulDegradation(t *testing.T) {
 
 	configPath := filepath.Join(tmpDir, "config.yaml")
 	statePath := filepath.Join(tmpDir, "state.json")
+	pidPath := filepath.Join(tmpDir, "daemon.pid")
 
 	configContent := `
 timeout:
@@ -309,7 +314,8 @@ safety:
 		t.Fatalf("Failed to set KUBECONFIG: %v", err)
 	}
 
-	daemon, err := NewDaemon(configPath, statePath)
+	pidFile := NewPIDFileWithPath(pidPath)
+	daemon, err := NewDaemonWithPIDFile(configPath, statePath, pidFile)
 	if err != nil {
 		t.Fatalf("NewDaemon failed: %v", err)
 	}
@@ -349,6 +355,7 @@ func TestWatchKubeconfigHandlesFileRecreation(t *testing.T) {
 
 	configPath := filepath.Join(tmpDir, "config.yaml")
 	statePath := filepath.Join(tmpDir, "state.json")
+	pidPath := filepath.Join(tmpDir, "daemon.pid")
 
 	configContent := `
 timeout:
@@ -368,7 +375,8 @@ safety:
 		t.Fatalf("Failed to write config: %v", err)
 	}
 
-	daemon, err := NewDaemon(configPath, statePath)
+	pidFile := NewPIDFileWithPath(pidPath)
+	daemon, err := NewDaemonWithPIDFile(configPath, statePath, pidFile)
 	if err != nil {
 		t.Fatalf("NewDaemon failed: %v", err)
 	}
