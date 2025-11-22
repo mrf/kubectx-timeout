@@ -6,8 +6,11 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
+	"syscall"
+	"time"
 
 	"github.com/mrf/kubectx-timeout/internal"
 )
@@ -43,6 +46,16 @@ func main() {
 		cmdDaemonRestart()
 	case "daemon-status":
 		cmdDaemonStatus()
+	case "start":
+		cmdStart()
+	case "stop":
+		cmdStop()
+	case "status":
+		cmdStatus()
+	case "reload":
+		cmdReload()
+	case "reset":
+		cmdReset()
 	case "install-shell":
 		cmdInstallShell()
 	case "uninstall-shell":
@@ -67,13 +80,18 @@ Usage:
 Commands:
   version              Show version information
   init                 Initialize configuration file
-  daemon               Run the timeout monitoring daemon
+  daemon               Run the timeout monitoring daemon (foreground)
   daemon-install       Install daemon as launchd service (macOS)
   daemon-uninstall     Remove daemon launchd service
-  daemon-start         Start the daemon
-  daemon-stop          Stop the daemon
-  daemon-restart       Restart the daemon
-  daemon-status        Show daemon status
+  daemon-start         Start the daemon via launchd
+  daemon-stop          Stop the daemon via launchd
+  daemon-restart       Restart the daemon via launchd
+  daemon-status        Show daemon launchd status
+  status               Show daemon status and timeout information
+  start                Start the daemon in background (direct)
+  stop                 Stop the daemon (direct)
+  reload               Reload daemon configuration
+  reset                Reset activity timer
   install-shell        Install shell integration (kubectl wrapper)
   uninstall-shell      Remove shell integration
   record-activity      Record kubectl activity (used by shell integration)
@@ -90,16 +108,19 @@ Examples:
   kubectx-timeout install-shell bash
   kubectx-timeout install-shell zsh
 
-  # Install daemon to run automatically
+  # Install daemon to run automatically via launchd (macOS)
   kubectx-timeout daemon-install
-
-  # Control daemon
   kubectx-timeout daemon-start
-  kubectx-timeout daemon-stop
-  kubectx-timeout daemon-restart
   kubectx-timeout daemon-status
 
-  # Run daemon manually (for testing)
+  # Direct daemon control (alternative to launchd)
+  kubectx-timeout start         # Start daemon in background
+  kubectx-timeout status        # Check status and timeout info
+  kubectx-timeout stop          # Stop daemon
+  kubectx-timeout reload        # Reload configuration
+  kubectx-timeout reset         # Reset activity timer
+
+  # Run daemon in foreground (for debugging)
   kubectx-timeout daemon
 
 For more information, visit: https://github.com/mrf/kubectx-timeout
@@ -498,4 +519,277 @@ func isValidShellArg(shell string) bool {
 	default:
 		return false
 	}
+}
+
+func cmdStatus() {
+	defaultStatePath := internal.GetStatePath()
+	defaultConfigPath := internal.GetConfigPath()
+
+	fs := flag.NewFlagSet("status", flag.ExitOnError)
+	statePath := fs.String("state", defaultStatePath, "Path to state file")
+	configPath := fs.String("config", defaultConfigPath, "Path to configuration file")
+	if err := fs.Parse(os.Args[2:]); err != nil {
+		log.Fatalf("Failed to parse flags: %v", err)
+	}
+
+	// Check daemon status
+	pidFile := internal.NewPIDFile()
+	pid, err := pidFile.ReadPID()
+	running := false
+	if err == nil {
+		// Check if process is actually running
+		process, err := os.FindProcess(pid)
+		if err == nil {
+			err = process.Signal(syscall.Signal(0))
+			running = (err == nil)
+		}
+	}
+
+	// Load configuration
+	config, err := internal.LoadConfig(*configPath)
+	if err != nil {
+		log.Fatalf("Failed to load config: %v", err)
+	}
+
+	// Load state
+	stateManager, err := internal.NewStateManager(*statePath)
+	if err != nil {
+		log.Fatalf("Failed to create state manager: %v", err)
+	}
+
+	lastActivity, lastContext, err := stateManager.GetLastActivity()
+	if err != nil {
+		log.Fatalf("Failed to get last activity: %v", err)
+	}
+
+	// Get current context
+	currentContext, err := internal.GetCurrentContext()
+	if err != nil {
+		fmt.Printf("Warning: Failed to get current context: %v\n", err)
+		currentContext = "unknown"
+	}
+
+	// Display status
+	fmt.Println("kubectx-timeout Status")
+	fmt.Println(strings.Repeat("=", 60))
+
+	// Daemon status
+	if running {
+		fmt.Printf("Daemon:           Running (PID: %d)\n", pid)
+	} else {
+		fmt.Println("Daemon:           Not running")
+	}
+
+	// Context information
+	fmt.Printf("Current Context:  %s\n", currentContext)
+	fmt.Printf("Default Context:  %s\n", config.DefaultContext)
+
+	// Activity information
+	if !lastActivity.IsZero() {
+		timeSince, _ := stateManager.TimeSinceLastActivity()
+		timeout := config.GetTimeoutForContext(currentContext)
+		remaining := timeout - timeSince
+
+		fmt.Printf("Last Activity:    %s (%s ago)\n",
+			lastActivity.Format("2006-01-02 15:04:05"),
+			timeSince.Round(1*time.Second))
+		fmt.Printf("Last Context:     %s\n", lastContext)
+		fmt.Printf("Timeout:          %s\n", timeout)
+
+		if remaining > 0 {
+			fmt.Printf("Time Remaining:   %s\n", remaining.Round(1*time.Second))
+		} else {
+			fmt.Printf("Time Remaining:   Timeout exceeded by %s\n",
+				(-remaining).Round(1*time.Second))
+		}
+	} else {
+		fmt.Println("Last Activity:    No activity recorded")
+	}
+
+	// Configuration
+	fmt.Println()
+	fmt.Printf("Config File:      %s\n", *configPath)
+	fmt.Printf("State File:       %s\n", *statePath)
+	fmt.Printf("Check Interval:   %s\n", config.Timeout.CheckInterval)
+}
+
+func cmdStart() {
+	// Check if already running
+	pidFile := internal.NewPIDFile()
+	pid, err := pidFile.ReadPID()
+	if err == nil {
+		// Check if process is actually running
+		process, err := os.FindProcess(pid)
+		if err == nil {
+			err = process.Signal(syscall.Signal(0))
+			if err == nil {
+				fmt.Printf("Daemon is already running (PID: %d)\n", pid)
+				os.Exit(0)
+			}
+		}
+	}
+
+	// Get binary path
+	binPath, err := os.Executable()
+	if err != nil {
+		log.Fatalf("Failed to get executable path: %v", err)
+	}
+
+	// Start daemon in background
+	defaultConfigPath := internal.GetConfigPath()
+	defaultStatePath := internal.GetStatePath()
+
+	// #nosec G204 -- binPath is from os.Executable(), not user input
+	cmd := exec.Command(binPath, "daemon",
+		"--config", defaultConfigPath,
+		"--state", defaultStatePath)
+
+	// Detach from current process
+	cmd.Stdout = nil
+	cmd.Stderr = nil
+	cmd.Stdin = nil
+
+	if err := cmd.Start(); err != nil {
+		log.Fatalf("Failed to start daemon: %v", err)
+	}
+
+	// Wait a moment to verify it started
+	time.Sleep(500 * time.Millisecond)
+
+	// Verify it's running by reading PID file
+	pid, err = pidFile.ReadPID()
+	if err != nil {
+		fmt.Println("✗ Daemon failed to start (no PID file created)")
+		os.Exit(1)
+	}
+
+	// Check if process is actually running
+	process, err := os.FindProcess(pid)
+	if err == nil {
+		err = process.Signal(syscall.Signal(0))
+		if err == nil {
+			fmt.Printf("✓ Daemon started successfully (PID: %d)\n", pid)
+		} else {
+			fmt.Println("✗ Daemon failed to start (process not running)")
+			os.Exit(1)
+		}
+	} else {
+		fmt.Println("✗ Daemon failed to start (process not found)")
+		os.Exit(1)
+	}
+}
+
+func cmdStop() {
+	pidFile := internal.NewPIDFile()
+	pid, err := pidFile.ReadPID()
+	if err != nil {
+		fmt.Println("Daemon is not running (no PID file)")
+		os.Exit(0)
+	}
+
+	// Check if process is actually running
+	process, err := os.FindProcess(pid)
+	if err != nil {
+		fmt.Println("Daemon is not running")
+		os.Exit(0)
+	}
+
+	err = process.Signal(syscall.Signal(0))
+	if err != nil {
+		fmt.Println("Daemon is not running (stale PID file)")
+		_ = pidFile.Release() // Clean up stale PID file
+		os.Exit(0)
+	}
+
+	// Send SIGTERM to daemon
+	fmt.Printf("Stopping daemon (PID: %d)...\n", pid)
+	if err := process.Signal(syscall.SIGTERM); err != nil {
+		log.Fatalf("Failed to send SIGTERM: %v", err)
+	}
+
+	// Wait for process to exit (with timeout)
+	timeout := time.After(5 * time.Second)
+	ticker := time.NewTicker(100 * time.Millisecond)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-timeout:
+			fmt.Println("✗ Daemon did not stop within 5 seconds")
+			fmt.Println("  Try: kill -9", pid)
+			os.Exit(1)
+		case <-ticker.C:
+			// Check if process is still running
+			err := process.Signal(syscall.Signal(0))
+			if err != nil {
+				fmt.Println("✓ Daemon stopped successfully")
+				return
+			}
+		}
+	}
+}
+
+func cmdReload() {
+	pidFile := internal.NewPIDFile()
+	pid, err := pidFile.ReadPID()
+	if err != nil {
+		fmt.Println("Daemon is not running (no PID file)")
+		fmt.Println("Start it with: kubectx-timeout start")
+		os.Exit(1)
+	}
+
+	// Check if process is actually running
+	process, err := os.FindProcess(pid)
+	if err != nil {
+		fmt.Println("Daemon is not running")
+		fmt.Println("Start it with: kubectx-timeout start")
+		os.Exit(1)
+	}
+
+	err = process.Signal(syscall.Signal(0))
+	if err != nil {
+		fmt.Println("Daemon is not running (stale PID file)")
+		fmt.Println("Start it with: kubectx-timeout start")
+		_ = pidFile.Release() // Clean up stale PID file
+		os.Exit(1)
+	}
+
+	fmt.Printf("Reloading daemon configuration (PID: %d)...\n", pid)
+	if err := process.Signal(syscall.SIGHUP); err != nil {
+		log.Fatalf("Failed to send SIGHUP: %v", err)
+	}
+
+	fmt.Println("✓ Reload signal sent successfully")
+	fmt.Println("  Check daemon logs to confirm configuration reloaded")
+}
+
+func cmdReset() {
+	defaultStatePath := internal.GetStatePath()
+	defaultConfigPath := internal.GetConfigPath()
+
+	fs := flag.NewFlagSet("reset", flag.ExitOnError)
+	statePath := fs.String("state", defaultStatePath, "Path to state file")
+	configPath := fs.String("config", defaultConfigPath, "Path to configuration file")
+	if err := fs.Parse(os.Args[2:]); err != nil {
+		log.Fatalf("Failed to parse flags: %v", err)
+	}
+
+	// Get current context
+	currentContext, err := internal.GetCurrentContext()
+	if err != nil {
+		log.Fatalf("Failed to get current context: %v", err)
+	}
+
+	// Create activity tracker and record activity
+	tracker, err := internal.NewActivityTracker(*statePath, *configPath)
+	if err != nil {
+		log.Fatalf("Failed to create activity tracker: %v", err)
+	}
+
+	if err := tracker.RecordActivity(); err != nil {
+		log.Fatalf("Failed to reset activity timer: %v", err)
+	}
+
+	fmt.Printf("✓ Activity timer reset for context '%s'\n", currentContext)
+	fmt.Println("  Timeout period has been reset to 0")
 }

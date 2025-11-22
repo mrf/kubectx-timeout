@@ -152,6 +152,7 @@ func TestDaemonReloadConfig(t *testing.T) {
 	hasOriginal := originalConfig != nil
 
 	statePath := filepath.Join(tmpDir, "state.json")
+	pidPath := filepath.Join(tmpDir, "daemon.pid")
 
 	configContent := `
 timeout:
@@ -178,7 +179,8 @@ safety:
 		defer os.Remove(configPath)
 	}
 
-	daemon, err := NewDaemon(configPath, statePath)
+	pidFile := NewPIDFileWithPath(pidPath)
+	daemon, err := NewDaemonWithPIDFile(configPath, statePath, pidFile)
 	if err != nil {
 		t.Fatalf("NewDaemon() error = %v", err)
 	}
@@ -217,6 +219,7 @@ func TestDaemonStartupWithStaleState(t *testing.T) {
 
 	configPath := filepath.Join(tmpDir, "config.yaml")
 	statePath := filepath.Join(tmpDir, "state.json")
+	pidPath := filepath.Join(tmpDir, "daemon.pid")
 
 	// Use test context from isolated kubeconfig
 	currentContext := "test-default"
@@ -259,7 +262,8 @@ safety:
 	}
 
 	// Create daemon - this should detect the context change and record activity
-	daemon, err := NewDaemon(configPath, statePath)
+	pidFile := NewPIDFileWithPath(pidPath)
+	daemon, err := NewDaemonWithPIDFile(configPath, statePath, pidFile)
 	if err != nil {
 		t.Fatalf("NewDaemon failed: %v", err)
 	}
@@ -289,6 +293,7 @@ func TestDaemonStartupWithStaleTimestamp(t *testing.T) {
 
 	configPath := filepath.Join(configDir, "config.yaml")
 	statePath := filepath.Join(configDir, "state.json")
+	pidPath := filepath.Join(configDir, "daemon.pid")
 
 	// Use test context from isolated kubeconfig
 	currentContext := "test-default"
@@ -327,7 +332,8 @@ daemon:
 	}
 
 	// Create daemon - this should detect stale timestamp and reset activity timer
-	daemon, err := NewDaemon(configPath, statePath)
+	pidFile := NewPIDFileWithPath(pidPath)
+	daemon, err := NewDaemonWithPIDFile(configPath, statePath, pidFile)
 	if err != nil {
 		t.Fatalf("NewDaemon failed: %v", err)
 	}
@@ -363,6 +369,7 @@ func TestDaemonStartupWithZeroTimestamp(t *testing.T) {
 
 	configPath := filepath.Join(configDir, "config.yaml")
 	statePath := filepath.Join(configDir, "state.json")
+	pidPath := filepath.Join(configDir, "daemon.pid")
 
 	// Use test context from isolated kubeconfig
 	currentContext := "test-default"
@@ -401,7 +408,8 @@ daemon:
 	}
 
 	// Create daemon - this should detect zero timestamp and reset activity timer
-	daemon, err := NewDaemon(configPath, statePath)
+	pidFile := NewPIDFileWithPath(pidPath)
+	daemon, err := NewDaemonWithPIDFile(configPath, statePath, pidFile)
 	if err != nil {
 		t.Fatalf("NewDaemon failed: %v", err)
 	}
