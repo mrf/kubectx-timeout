@@ -340,6 +340,88 @@ kubectx-timeout daemon
 
 For detailed documentation on daemon management, architecture, troubleshooting, and advanced usage, see [DAEMON.md](DAEMON.md).
 
+## Uninstallation
+
+`kubectx-timeout` provides a comprehensive uninstallation command that cleanly removes all components from your system.
+
+### Complete Uninstallation
+
+```bash
+# Interactive uninstallation (prompts for confirmation)
+kubectx-timeout uninstall
+
+# Non-interactive (skip confirmation)
+kubectx-timeout uninstall --yes
+```
+
+This will:
+1. Stop the running daemon (if active)
+2. Remove launchd configuration (`~/Library/LaunchAgents/com.kubectx-timeout.plist`)
+3. Remove shell integration from your shell profile(s)
+4. Remove configuration files (`~/.config/kubectx-timeout/`)
+5. Remove state files (`~/.local/state/kubectx-timeout/`)
+6. Remove the binary (by default)
+
+### Uninstallation Options
+
+```bash
+# Keep configuration and state files
+kubectx-timeout uninstall --keep-config
+
+# Keep the binary (remove everything else)
+kubectx-timeout uninstall --keep-binary
+
+# Remove everything including binary
+kubectx-timeout uninstall --all
+
+# Remove from all shell profiles (bash, zsh, fish)
+kubectx-timeout uninstall --all-shells
+
+# Target a specific shell
+kubectx-timeout uninstall bash
+kubectx-timeout uninstall zsh
+
+# Specify custom binary path
+kubectx-timeout uninstall --binary /custom/path/kubectx-timeout
+```
+
+### What Gets Removed
+
+The uninstall command removes the following components:
+
+| Component | Location | Removed by Default |
+|-----------|----------|-------------------|
+| Daemon (launchd) | `~/Library/LaunchAgents/com.kubectx-timeout.plist` | Yes |
+| Shell Integration | `~/.bashrc`, `~/.zshrc`, `~/.config/fish/config.fish` | Yes |
+| Configuration | `~/.config/kubectx-timeout/` | Yes (unless `--keep-config`) |
+| State Files | `~/.local/state/kubectx-timeout/` | Yes (unless `--keep-config`) |
+| Binary | `/usr/local/bin/kubectx-timeout` (or detected path) | Yes (unless `--keep-binary`) |
+
+### Backups
+
+The uninstall process automatically creates backups before removing shell integrations:
+- Shell profiles: `~/.bashrc.kubectx-timeout.backup`, `~/.zshrc.kubectx-timeout.backup`, etc.
+
+### Manual Uninstallation
+
+If you prefer to uninstall manually:
+
+```bash
+# 1. Stop and remove daemon
+launchctl unload ~/Library/LaunchAgents/com.kubectx-timeout.plist
+rm ~/Library/LaunchAgents/com.kubectx-timeout.plist
+
+# 2. Remove shell integration
+kubectx-timeout uninstall-shell bash  # or zsh, fish
+
+# 3. Remove configuration and state
+rm -rf ~/.config/kubectx-timeout
+rm -rf ~/.local/state/kubectx-timeout
+
+# 4. Remove binary
+sudo rm /usr/local/bin/kubectx-timeout
+```
+
 ## How It Works in Detail
 
 ### Activity Tracking
