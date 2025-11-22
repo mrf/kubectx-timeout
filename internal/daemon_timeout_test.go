@@ -118,8 +118,9 @@ safety:
 		t.Errorf("State has wrong context: expected %s, got %s", prodContext, lastContext)
 	}
 
-	// Step 3: Wait for timeout to exceed (2s timeout + 500ms check interval + buffer)
-	waitTime := 3 * time.Second
+	// Step 3: Wait for timeout to exceed (2s timeout + 500ms check interval + kubectl exec time)
+	// Need extra buffer for kubectl command execution which can be slow
+	waitTime := 4 * time.Second
 	t.Logf("Waiting %v for timeout to trigger...", waitTime)
 	time.Sleep(waitTime)
 
@@ -317,9 +318,9 @@ safety:
 	stateManager, _ := NewStateManager(statePath)
 	stateManager.RecordActivity(prodContext)
 
-	// Wait for timeout
+	// Wait for timeout (1s) + check interval (300ms) + kubectl execution time (~1s)
 	t.Logf("Waiting for timeout...")
-	time.Sleep(2 * time.Second)
+	time.Sleep(3 * time.Second)
 
 	// Verify switched to safe context (with retry for race conditions)
 	var currentCtx string

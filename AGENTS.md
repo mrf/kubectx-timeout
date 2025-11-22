@@ -4,6 +4,14 @@ This file contains mandatory instructions for all AI agents working on this repo
 
 ## Critical Rules
 
+### 0. Never Merge with Failing Tests
+
+**NEVER merge with failing tests.** All tests must pass before merging to main.
+
+- If tests fail, investigate and fix them before merging
+- If a test is flaky or unrelated to your changes, fix it first or ensure it's addressed separately
+- No exceptions to this rule
+
 ### 1. Test-Driven Development (TDD) is MANDATORY
 
 All code changes MUST follow TDD practices:
