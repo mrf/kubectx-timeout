@@ -60,6 +60,8 @@ func main() {
 		cmdInstallShell()
 	case "uninstall-shell":
 		cmdUninstallShell()
+	case "uninstall":
+		cmdUninstall()
 	case "record-activity":
 		cmdRecordActivity()
 	case "help", "-h", "--help":
@@ -94,6 +96,7 @@ Commands:
   reset                Reset activity timer
   install-shell        Install shell integration (kubectl wrapper)
   uninstall-shell      Remove shell integration
+  uninstall            Complete uninstallation of kubectx-timeout
   record-activity      Record kubectl activity (used by shell integration)
   help                 Show this help message
 
@@ -122,6 +125,15 @@ Examples:
 
   # Run daemon in foreground (for debugging)
   kubectx-timeout daemon
+
+  # Complete uninstallation
+  kubectx-timeout uninstall
+
+  # Uninstall but keep configuration files
+  kubectx-timeout uninstall --keep-config
+
+  # Uninstall everything including binary
+  kubectx-timeout uninstall --all
 
 For more information, visit: https://github.com/mrf/kubectx-timeout
 `, version)
@@ -792,4 +804,159 @@ func cmdReset() {
 
 	fmt.Printf("✓ Activity timer reset for context '%s'\n", currentContext)
 	fmt.Println("  Timeout period has been reset to 0")
+}
+
+func cmdUninstall() {
+	// Detect the current binary path
+	defaultBinaryPath := "/usr/local/bin/kubectx-timeout" // fallback default
+	if execPath, err := os.Executable(); err == nil {
+		// Get absolute path
+		if absPath, err := filepath.Abs(execPath); err == nil {
+			defaultBinaryPath = absPath
+		}
+	}
+
+	fs := flag.NewFlagSet("uninstall", flag.ExitOnError)
+	all := fs.Bool("all", false, "Remove everything including binary")
+	keepConfig := fs.Bool("keep-config", false, "Keep configuration and state files")
+	keepBinary := fs.Bool("keep-binary", false, "Keep the binary (remove everything else)")
+	yes := fs.Bool("yes", false, "Skip confirmation prompts")
+	allShells := fs.Bool("all-shells", false, "Remove from all shell profiles (bash, zsh, fish)")
+	binaryPath := fs.String("binary", defaultBinaryPath, "Path to binary to remove")
+
+	if err := fs.Parse(os.Args[2:]); err != nil {
+		log.Fatalf("Failed to parse flags: %v", err)
+	}
+
+	// Show what will be removed
+	fmt.Println("kubectx-timeout Uninstallation")
+	fmt.Println(strings.Repeat("=", 60))
+	fmt.Println("\nThe following will be removed:")
+
+	// Check what's installed
+	daemonRunning, _ := internal.CheckDaemonStatus()
+	if daemonRunning {
+		fmt.Println("  - Daemon (will be stopped)")
+	}
+
+	plistPath, _ := internal.GetLaunchdPlistPath()
+	if plistPath != "" {
+		if _, err := os.Stat(plistPath); err == nil {
+			fmt.Println("  - Launchd configuration")
+		}
+	}
+
+	installedShells, _ := internal.GetInstalledShells()
+	if len(installedShells) > 0 {
+		fmt.Printf("  - Shell integration (%s)\n", strings.Join(installedShells, ", "))
+	}
+
+	configDir := internal.GetConfigDir()
+	stateDir := internal.GetStateDir()
+	hasConfig := false
+	hasState := false
+
+	if _, err := os.Stat(configDir); err == nil {
+		hasConfig = true
+	}
+	if _, err := os.Stat(stateDir); err == nil {
+		hasState = true
+	}
+
+	if !*keepConfig {
+		if hasConfig {
+			fmt.Printf("  - Configuration files (%s)\n", configDir)
+		}
+		if hasState {
+			fmt.Printf("  - State files (%s)\n", stateDir)
+		}
+	}
+
+	removeBinary := *all || !*keepBinary
+
+	if removeBinary {
+		if _, err := os.Stat(*binaryPath); err == nil {
+			fmt.Printf("  - Binary (%s)\n", *binaryPath)
+		}
+	}
+
+	if *keepConfig {
+		fmt.Println("\nConfiguration and state files will be kept")
+	}
+	if *keepBinary {
+		fmt.Println("Binary will be kept")
+	}
+
+	// Confirm unless --yes flag is set
+	if !*yes {
+		fmt.Print("\nDo you want to proceed with uninstallation? [y/N]: ")
+		reader := bufio.NewReader(os.Stdin)
+		response, err := reader.ReadString('\n')
+		if err != nil {
+			log.Fatalf("Failed to read input: %v", err)
+		}
+		response = strings.TrimSpace(strings.ToLower(response))
+		if response != "y" && response != "yes" {
+			fmt.Println("Uninstallation cancelled")
+			return
+		}
+	}
+
+	// Perform uninstallation
+	fmt.Println("\nUninstalling kubectx-timeout...")
+
+	opts := internal.UninstallOptions{
+		KeepConfig:  *keepConfig,
+		KeepBinary:  !removeBinary,
+		Force:       *yes,
+		AllShells:   *allShells,
+		TargetShell: "",
+		BinaryPath:  *binaryPath,
+	}
+
+	// If specific shell is provided as argument
+	args := fs.Args()
+	if len(args) > 0 {
+		opts.TargetShell = args[0]
+		if !isValidShellArg(opts.TargetShell) {
+			log.Fatalf("Unsupported shell: %s\nSupported shells: bash, zsh, fish", opts.TargetShell)
+		}
+	}
+
+	result, err := internal.Uninstall(opts)
+	if err != nil {
+		log.Fatalf("Uninstallation failed: %v", err)
+	}
+
+	// Show results
+	fmt.Println(internal.FormatUninstallResult(result))
+
+	// Show next steps
+	if len(result.ShellsProcessed) > 0 {
+		fmt.Println("\nNext steps:")
+		fmt.Println("  - Restart your shell for changes to take effect")
+		fmt.Println("  - Or run: source ~/.bashrc (or ~/.zshrc for zsh)")
+	}
+
+	if removeBinary && result.BinaryRemoved {
+		fmt.Println("\nThe kubectx-timeout binary has been removed.")
+	}
+
+	if len(result.Errors) == 0 {
+		fmt.Println("\n✓ Uninstallation completed successfully!")
+	} else {
+		// Filter out "Could not find specified service" errors
+		hasRealErrors := false
+		for _, err := range result.Errors {
+			if !strings.Contains(err.Error(), "Could not find specified service") {
+				hasRealErrors = true
+				break
+			}
+		}
+		if hasRealErrors {
+			fmt.Println("\n⚠ Uninstallation completed with some warnings (see above)")
+		} else {
+			fmt.Println("\n✓ Uninstallation completed successfully!")
+		}
+	}
 }
