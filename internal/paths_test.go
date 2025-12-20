@@ -243,3 +243,48 @@ func TestGetKubeconfigPath(t *testing.T) {
 		})
 	}
 }
+
+func TestGetLogPath(t *testing.T) {
+	tests := []struct {
+		name           string
+		xdgStateHome   string
+		home           string
+		expectedSuffix string
+	}{
+		{
+			name:           "XDG state path",
+			xdgStateHome:   "/custom/state",
+			home:           "/home/user",
+			expectedSuffix: "/custom/state/kubectx-timeout/daemon.log",
+		},
+		{
+			name:           "Default XDG state path",
+			xdgStateHome:   "",
+			home:           "/home/user",
+			expectedSuffix: "/home/user/.local/state/kubectx-timeout/daemon.log",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			oldXDG := os.Getenv("XDG_STATE_HOME")
+			oldHome := os.Getenv("HOME")
+			defer func() {
+				os.Setenv("XDG_STATE_HOME", oldXDG)
+				os.Setenv("HOME", oldHome)
+			}()
+
+			os.Setenv("HOME", tt.home)
+			if tt.xdgStateHome != "" {
+				os.Setenv("XDG_STATE_HOME", tt.xdgStateHome)
+			} else {
+				os.Unsetenv("XDG_STATE_HOME")
+			}
+
+			result := GetLogPath()
+			if result != tt.expectedSuffix {
+				t.Errorf("GetLogPath() = %v, want %v", result, tt.expectedSuffix)
+			}
+		})
+	}
+}

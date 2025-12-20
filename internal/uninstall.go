@@ -91,6 +91,7 @@ func stopAndRemoveDaemon(result *UninstallResult) error {
 		// If unload fails, try to stop it by label
 		// #nosec G204 -- label is hardcoded, not user input
 		stopCmd := exec.Command("launchctl", "stop", "com.kubectx-timeout")
+		// #nosec G104 -- Intentionally ignoring error, daemon might not be running
 		stopCmd.Run() // Ignore error, daemon might not be running
 
 		// Continue even if unload failed - the plist might not be loaded
