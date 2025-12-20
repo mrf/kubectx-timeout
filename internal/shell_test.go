@@ -100,7 +100,10 @@ func TestGetShellProfilePath(t *testing.T) {
 				bashrc := filepath.Join(home, ".bashrc")
 				if _, err := os.Stat(bashProfile); err == nil {
 					return bashProfile
+				} else if _, err := os.Stat(bashrc); err == nil {
+					return bashrc
 				}
+				// Neither exists - default to .bashrc
 				return bashrc
 			}(),
 			expectError: false,

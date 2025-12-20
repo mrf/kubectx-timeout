@@ -104,12 +104,16 @@ Examples:
   # Initialize configuration
   kubectx-timeout init
 
-  # Install shell integration for your current shell
-  kubectx-timeout install-shell
+  # Detect your current shell
+  kubectx-timeout install-shell --detect
 
-  # Install for a specific shell
+  # Install shell integration (shell argument required)
   kubectx-timeout install-shell bash
   kubectx-timeout install-shell zsh
+  kubectx-timeout install-shell fish
+
+  # Uninstall shell integration
+  kubectx-timeout uninstall-shell bash
 
   # Install daemon to run automatically via launchd (macOS)
   kubectx-timeout daemon-install
@@ -183,8 +187,9 @@ func cmdInit() {
 	fmt.Printf("  Config file: %s\n", *configPath)
 	fmt.Println("\nNext steps:")
 	fmt.Println("  1. Review and customize the configuration file")
-	fmt.Println("  2. Run: kubectx-timeout install-shell")
-	fmt.Println("  3. Restart your shell or run: source ~/.bashrc (or ~/.zshrc)")
+	fmt.Println("  2. Detect your shell: kubectx-timeout install-shell --detect")
+	fmt.Println("  3. Install shell integration: kubectx-timeout install-shell <bash|zsh|fish>")
+	fmt.Println("  4. Restart your shell or source your profile file")
 }
 
 // initializeConfig creates a default configuration file
@@ -301,28 +306,62 @@ func cmdInstallShell() {
 	noConfirm := fs.Bool("yes", false, "Skip confirmation prompts")
 	noReload := fs.Bool("no-reload", false, "Don't offer to reload shell")
 	binaryPath := fs.String("binary", defaultBinaryPath, "Path to kubectx-timeout binary")
+	detectShell := fs.Bool("detect", false, "Detect and suggest shell instead of installing")
 
 	if err := fs.Parse(os.Args[2:]); err != nil {
 		log.Fatalf("Failed to parse flags: %v", err)
 	}
 
-	// Determine shell
-	var targetShell string
-	args := fs.Args()
-	if len(args) > 0 {
-		// Shell specified as argument
-		targetShell = args[0]
-		if !isValidShellArg(targetShell) {
-			log.Fatalf("Unsupported shell: %s\nSupported shells: bash, zsh, fish", targetShell)
-		}
-	} else {
-		// Auto-detect shell
+	// Handle --detect flag
+	if *detectShell {
 		detected, err := internal.DetectShell()
 		if err != nil {
-			log.Fatalf("Failed to detect shell: %v\nPlease specify shell explicitly: kubectx-timeout install-shell <bash|zsh|fish>", err)
+			log.Fatalf("Failed to detect shell: %v", err)
 		}
-		targetShell = detected
-		fmt.Printf("Detected shell: %s\n", targetShell)
+
+		profilePath, err := internal.GetShellProfilePath(detected)
+		if err != nil {
+			log.Fatalf("Failed to get shell profile path: %v", err)
+		}
+
+		// Check if profile exists
+		profileExists := false
+		if _, err := os.Stat(profilePath); err == nil {
+			profileExists = true
+		}
+
+		fmt.Printf("Detected shell: %s\n", detected)
+		fmt.Printf("Profile path: %s\n", profilePath)
+		if profileExists {
+			fmt.Printf("Profile exists: yes\n")
+		} else {
+			fmt.Printf("Profile exists: no (will be created during installation)\n")
+		}
+		fmt.Printf("\nTo install shell integration, run:\n")
+		fmt.Printf("  kubectx-timeout install-shell %s\n", detected)
+		return
+	}
+
+	// Determine shell - now required as argument
+	args := fs.Args()
+	if len(args) == 0 {
+		// No shell specified - show error with helpful message
+		fmt.Fprintf(os.Stderr, "Error: Shell argument is required\n\n")
+		fmt.Fprintf(os.Stderr, "Usage:\n")
+		fmt.Fprintf(os.Stderr, "  kubectx-timeout install-shell <shell>\n\n")
+		fmt.Fprintf(os.Stderr, "Supported shells: bash, zsh, fish\n\n")
+		fmt.Fprintf(os.Stderr, "Examples:\n")
+		fmt.Fprintf(os.Stderr, "  kubectx-timeout install-shell bash\n")
+		fmt.Fprintf(os.Stderr, "  kubectx-timeout install-shell zsh\n")
+		fmt.Fprintf(os.Stderr, "  kubectx-timeout install-shell fish\n\n")
+		fmt.Fprintf(os.Stderr, "To detect your current shell:\n")
+		fmt.Fprintf(os.Stderr, "  kubectx-timeout install-shell --detect\n")
+		os.Exit(1)
+	}
+
+	targetShell := args[0]
+	if !isValidShellArg(targetShell) {
+		log.Fatalf("Unsupported shell: %s\nSupported shells: bash, zsh, fish", targetShell)
 	}
 
 	// Get profile path
@@ -331,7 +370,17 @@ func cmdInstallShell() {
 		log.Fatalf("Failed to get shell profile path: %v", err)
 	}
 
+	// Validate profile path - warn if it doesn't exist but don't fail
+	profileExists := false
+	if _, err := os.Stat(profilePath); err == nil {
+		profileExists = true
+	}
+
+	fmt.Printf("Shell: %s\n", targetShell)
 	fmt.Printf("Shell profile: %s\n", profilePath)
+	if !profileExists {
+		fmt.Printf("Note: Profile file doesn't exist yet, it will be created\n")
+	}
 	fmt.Printf("Binary path: %s\n", *binaryPath)
 
 	// Check if already installed
@@ -424,28 +473,44 @@ func cmdInstallShell() {
 func cmdUninstallShell() {
 	fs := flag.NewFlagSet("uninstall-shell", flag.ExitOnError)
 	noConfirm := fs.Bool("yes", false, "Skip confirmation prompts")
+	detectShell := fs.Bool("detect", false, "Detect and suggest shell instead of uninstalling")
 
 	if err := fs.Parse(os.Args[2:]); err != nil {
 		log.Fatalf("Failed to parse flags: %v", err)
 	}
 
-	// Determine shell
-	var targetShell string
-	args := fs.Args()
-	if len(args) > 0 {
-		// Shell specified as argument
-		targetShell = args[0]
-		if !isValidShellArg(targetShell) {
-			log.Fatalf("Unsupported shell: %s\nSupported shells: bash, zsh, fish", targetShell)
-		}
-	} else {
-		// Auto-detect shell
+	// Handle --detect flag
+	if *detectShell {
 		detected, err := internal.DetectShell()
 		if err != nil {
-			log.Fatalf("Failed to detect shell: %v\nPlease specify shell explicitly: kubectx-timeout uninstall-shell <bash|zsh|fish>", err)
+			log.Fatalf("Failed to detect shell: %v", err)
 		}
-		targetShell = detected
-		fmt.Printf("Detected shell: %s\n", targetShell)
+		fmt.Printf("Detected shell: %s\n", detected)
+		fmt.Printf("\nTo uninstall shell integration, run:\n")
+		fmt.Printf("  kubectx-timeout uninstall-shell %s\n", detected)
+		return
+	}
+
+	// Determine shell - now required as argument
+	args := fs.Args()
+	if len(args) == 0 {
+		// No shell specified - show error with helpful message
+		fmt.Fprintf(os.Stderr, "Error: Shell argument is required\n\n")
+		fmt.Fprintf(os.Stderr, "Usage:\n")
+		fmt.Fprintf(os.Stderr, "  kubectx-timeout uninstall-shell <shell>\n\n")
+		fmt.Fprintf(os.Stderr, "Supported shells: bash, zsh, fish\n\n")
+		fmt.Fprintf(os.Stderr, "Examples:\n")
+		fmt.Fprintf(os.Stderr, "  kubectx-timeout uninstall-shell bash\n")
+		fmt.Fprintf(os.Stderr, "  kubectx-timeout uninstall-shell zsh\n")
+		fmt.Fprintf(os.Stderr, "  kubectx-timeout uninstall-shell fish\n\n")
+		fmt.Fprintf(os.Stderr, "To detect your current shell:\n")
+		fmt.Fprintf(os.Stderr, "  kubectx-timeout uninstall-shell --detect\n")
+		os.Exit(1)
+	}
+
+	targetShell := args[0]
+	if !isValidShellArg(targetShell) {
+		log.Fatalf("Unsupported shell: %s\nSupported shells: bash, zsh, fish", targetShell)
 	}
 
 	// Get profile path

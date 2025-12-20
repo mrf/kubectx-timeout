@@ -71,6 +71,7 @@ func isValidShell(shell string) bool {
 }
 
 // GetShellProfilePath returns the profile path for the given shell
+// It validates that the profile file exists or can be created
 func GetShellProfilePath(shell string) (string, error) {
 	home, err := os.UserHomeDir()
 	if err != nil {
@@ -85,7 +86,10 @@ func GetShellProfilePath(shell string) (string, error) {
 		bashrc := filepath.Join(home, ".bashrc")
 		if _, err := os.Stat(bashProfile); err == nil {
 			profile = bashProfile
+		} else if _, err := os.Stat(bashrc); err == nil {
+			profile = bashrc
 		} else {
+			// Neither exists - use .bashrc as default for creation
 			profile = bashrc
 		}
 	case ShellZsh:
