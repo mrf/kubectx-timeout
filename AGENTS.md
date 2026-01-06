@@ -383,3 +383,32 @@ make build
 - ✅ Build succeeds
 
 **No shortcuts. No exceptions.**
+
+## Issue Management
+
+This project uses GitHub Issues for tracking work. Use the `gh` CLI to find and manage issues:
+
+```bash
+# List open issues
+gh issue list
+
+# List issues with specific label
+gh issue list --label "priority:p1"
+
+# View issue details
+gh issue view 123
+
+# Create a new issue
+gh issue create --title "Title" --body "Description"
+
+# Add labels to an issue
+gh issue edit 123 --add-label "bug"
+
+# Close an issue
+gh issue close 123
+
+# Search issues
+gh issue list --search "keyword"
+```
+
+Always reference issue numbers in commits and PRs when applicable.
