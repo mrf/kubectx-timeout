@@ -36,10 +36,3 @@ state.json
 
 # Dependencies
 /vendor/
-
-# Beads database and runtime files (project-specific)
-.beads/*.db
-.beads/*.db-shm
-.beads/*.db-wal
-.beads/daemon.lock
-.beads/daemon.pid
