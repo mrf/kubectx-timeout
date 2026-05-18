@@ -140,6 +140,40 @@ func TestSwitchContextSafe(t *testing.T) {
 	}
 }
 
+func TestExecuteSwitch(t *testing.T) {
+	// Setup isolated test environment
+	tmpDir := t.TempDir()
+	restoreKubeconfig := setupTestKubeconfig(t, tmpDir)
+	defer restoreKubeconfig()
+
+	logger := log.New(os.Stdout, "[test] ", log.LstdFlags)
+	cs := NewContextSwitcher(logger)
+
+	t.Run("valid context", func(t *testing.T) {
+		err := cs.executeSwitch("test-prod")
+		if err != nil {
+			t.Fatalf("executeSwitch failed for valid context: %v", err)
+		}
+
+		current, err := GetCurrentContext()
+		if err != nil {
+			t.Fatalf("Failed to get current context: %v", err)
+		}
+		if current != "test-prod" {
+			t.Errorf("Expected current context 'test-prod', got '%s'", current)
+		}
+
+		_ = cs.executeSwitch("test-default")
+	})
+
+	t.Run("nonexistent context", func(t *testing.T) {
+		err := cs.executeSwitch("nonexistent-context")
+		if err == nil {
+			t.Fatal("executeSwitch should fail for nonexistent context")
+		}
+	})
+}
+
 func TestSwitchContextWithRetry(t *testing.T) {
 	// Setup isolated test environment
 	tmpDir := t.TempDir()

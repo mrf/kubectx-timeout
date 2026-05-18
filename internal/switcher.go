@@ -109,6 +109,7 @@ func (cs *ContextSwitcher) SwitchContext(targetContext string) error {
 
 // executeSwitch performs the actual context switch
 func (cs *ContextSwitcher) executeSwitch(targetContext string) error {
+	// #nosec G204 -- targetContext is validated against kubectl config get-contexts output before use
 	cmd := exec.Command("kubectl", "config", "use-context", targetContext)
 
 	var stderr bytes.Buffer
