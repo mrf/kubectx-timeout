@@ -231,6 +231,7 @@ func InstallIntegration(profilePath string, integrationCode string) error {
 		if err != nil {
 			return fmt.Errorf("failed to read profile for backup: %w", err)
 		}
+		// #nosec G703 -- backupPath is profilePath (from user home dir + known profile names) + fixed suffix, not user input
 		if err := os.WriteFile(backupPath, content, 0600); err != nil {
 			return fmt.Errorf("failed to create backup: %w", err)
 		}
@@ -305,6 +306,7 @@ func UninstallIntegration(profilePath string) error {
 	if err != nil {
 		return fmt.Errorf("failed to read profile for backup: %w", err)
 	}
+	// #nosec G703 -- backupPath is profilePath (from user home dir + known profile names) + fixed suffix, not user input
 	if err := os.WriteFile(backupPath, content, 0600); err != nil {
 		return fmt.Errorf("failed to create backup: %w", err)
 	}

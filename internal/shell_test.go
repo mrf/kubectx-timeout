@@ -366,6 +366,89 @@ func TestInstallAndUninstallIntegration(t *testing.T) {
 	})
 }
 
+func TestInstallIntegrationCreatesBackup(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "shell-backup-test-*")
+	if err != nil {
+		t.Fatalf("Failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	profilePath := filepath.Join(tmpDir, ".testrc")
+	binaryPath := "/usr/local/bin/kubectx-timeout"
+
+	// Create existing profile content
+	existingContent := "# My shell config\nexport FOO=bar\n"
+	if err := os.WriteFile(profilePath, []byte(existingContent), 0600); err != nil {
+		t.Fatalf("Failed to create profile: %v", err)
+	}
+
+	// Install integration (should create backup of existing profile)
+	code, err := GetShellIntegrationCode(ShellBash, binaryPath)
+	if err != nil {
+		t.Fatalf("Failed to get integration code: %v", err)
+	}
+	if err := InstallIntegration(profilePath, code); err != nil {
+		t.Fatalf("Failed to install integration: %v", err)
+	}
+
+	// Verify backup was created with original content
+	backupPath := profilePath + ".kubectx-timeout.backup"
+	backupContent, err := os.ReadFile(backupPath)
+	if err != nil {
+		t.Fatalf("Backup file not created at %s: %v", backupPath, err)
+	}
+	if string(backupContent) != existingContent {
+		t.Errorf("Backup content mismatch.\nExpected: %q\nGot:      %q", existingContent, string(backupContent))
+	}
+}
+
+func TestUninstallIntegrationCreatesBackup(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "shell-backup-test-*")
+	if err != nil {
+		t.Fatalf("Failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	profilePath := filepath.Join(tmpDir, ".testrc")
+	binaryPath := "/usr/local/bin/kubectx-timeout"
+
+	// Create profile with existing content
+	existingContent := "# My shell config\nexport FOO=bar\n"
+	if err := os.WriteFile(profilePath, []byte(existingContent), 0600); err != nil {
+		t.Fatalf("Failed to create profile: %v", err)
+	}
+
+	// Install integration
+	code, err := GetShellIntegrationCode(ShellBash, binaryPath)
+	if err != nil {
+		t.Fatalf("Failed to get integration code: %v", err)
+	}
+	if err := InstallIntegration(profilePath, code); err != nil {
+		t.Fatalf("Failed to install integration: %v", err)
+	}
+
+	// Read profile content after install (this is what uninstall should back up)
+	contentAfterInstall, err := os.ReadFile(profilePath)
+	if err != nil {
+		t.Fatalf("Failed to read profile after install: %v", err)
+	}
+
+	// Uninstall integration (should create backup of profile-with-integration)
+	if err := UninstallIntegration(profilePath); err != nil {
+		t.Fatalf("Failed to uninstall integration: %v", err)
+	}
+
+	// Verify backup was created with the content that existed before uninstall
+	backupPath := profilePath + ".kubectx-timeout.backup"
+	backupContent, err := os.ReadFile(backupPath)
+	if err != nil {
+		t.Fatalf("Backup file not created at %s: %v", backupPath, err)
+	}
+	if string(backupContent) != string(contentAfterInstall) {
+		t.Errorf("Backup content mismatch.\nExpected: %q\nGot:      %q", string(contentAfterInstall), string(backupContent))
+	}
+}
+
 func TestInstallIntegrationPreservesExistingContent(t *testing.T) {
 	// Create a temporary directory for test
 	tmpDir, err := os.MkdirTemp("", "shell-test-*")
