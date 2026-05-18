@@ -57,7 +57,7 @@ jobs:
           staticcheck ./...
 
       - name: Install kubectl for integration tests
-        uses: azure/setup-kubectl@v4
+        uses: azure/setup-kubectl@v5
 
       - name: Run tests with race detector
         run: go test -race -v -coverprofile=coverage.out ./...
